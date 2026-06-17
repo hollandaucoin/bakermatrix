@@ -1,0 +1,249 @@
+// Lightweight fetch-based API client with offline cache + submission outbox.
+//
+// GET requests to SC-facing endpoints are cached in IndexedDB.
+// POST/PUT/DELETE for committee/workshop submissions queue locally when offline.
+
+import {
+  URL_CACHE_KEY,
+  setCacheEntry,
+  getCacheEntry,
+  saveSession,
+  getCachedSession,
+  clearSession,
+} from './offlineStorage.js';
+import {
+  queueOfflineWrite,
+  notifyOutboxChange,
+  RESOURCE_TYPES,
+} from './offlineSync.js';
+
+const OFFLINE_WRITE_ROUTES = [
+  { match: /^\/api\/committee-submissions\/?$/, method: 'POST', resourceType: RESOURCE_TYPES.COMMITTEE_SUBMISSION },
+  { match: /^\/api\/committee-submissions\/[^/]+$/, method: 'PUT', resourceType: RESOURCE_TYPES.COMMITTEE_SUBMISSION },
+  { match: /^\/api\/committee-submissions\/[^/]+$/, method: 'DELETE', resourceType: RESOURCE_TYPES.COMMITTEE_SUBMISSION },
+  { match: /^\/api\/workshop-submissions\/?$/, method: 'POST', resourceType: RESOURCE_TYPES.WORKSHOP_SUBMISSION },
+  { match: /^\/api\/workshop-submissions\/[^/]+$/, method: 'PUT', resourceType: RESOURCE_TYPES.WORKSHOP_SUBMISSION },
+  { match: /^\/api\/workshop-submissions\/[^/]+$/, method: 'DELETE', resourceType: RESOURCE_TYPES.WORKSHOP_SUBMISSION },
+];
+
+const getOfflineWriteConfig = (method, url) => {
+  const path = url.split('?')[0];
+  return OFFLINE_WRITE_ROUTES.find(
+    (route) => route.method === method && route.match.test(path)
+  );
+};
+
+const buildMeta = ({ fromCache = false, cachedAt = null, offline = false } = {}) => ({
+  fromCache,
+  cachedAt,
+  offline,
+});
+
+async function requestDirect(method, url, body) {
+  const options = { method, credentials: 'include', headers: {} };
+
+  if (body !== undefined) {
+    options.headers['Content-Type'] = 'application/json';
+    options.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(url, options);
+
+  let data = null;
+  const text = await response.text();
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+
+  if (!response.ok) {
+    const message = (data && data.error) || `Request failed with status ${response.status}`;
+    const error = new Error(message);
+    error.response = { status: response.status, data };
+    throw error;
+  }
+
+  return { data, status: response.status };
+}
+
+async function readCachedGet(url) {
+  const cacheKey = URL_CACHE_KEY[url.split('?')[0]];
+  if (!cacheKey) return null;
+
+  const entry = await getCacheEntry(cacheKey);
+  if (!entry) return null;
+
+  if (entry.status === 404) {
+    const error = new Error(entry.data?.error || 'Not found');
+    error.response = { status: 404, data: entry.data };
+    error.fromCache = true;
+    error.cachedAt = entry.updatedAt;
+    throw error;
+  }
+
+  return {
+    data: entry.data,
+    status: entry.status,
+    meta: buildMeta({ fromCache: true, cachedAt: entry.updatedAt, offline: !navigator.onLine }),
+  };
+}
+
+async function writeCachedGet(url, data, status) {
+  const cacheKey = URL_CACHE_KEY[url.split('?')[0]];
+  if (!cacheKey) return;
+
+  await setCacheEntry(cacheKey, {
+    data,
+    status,
+    updatedAt: Date.now(),
+  });
+}
+
+const inflightGets = new Map();
+
+async function request(method, url, body) {
+  if (method === 'GET') {
+    const path = url.split('?')[0];
+    const existing = inflightGets.get(path);
+    if (existing) return existing;
+
+    const promise = requestInner(method, url, body).finally(() => {
+      inflightGets.delete(path);
+    });
+    inflightGets.set(path, promise);
+    return promise;
+  }
+
+  return requestInner(method, url, body);
+}
+
+async function requestInner(method, url, body) {
+  const cacheKey = URL_CACHE_KEY[url.split('?')[0]];
+  const offlineWrite = getOfflineWriteConfig(method, url);
+
+  if (offlineWrite && !navigator.onLine) {
+    const queued = await queueOfflineWrite({
+      method,
+      url,
+      body,
+      resourceType: offlineWrite.resourceType,
+    });
+    notifyOutboxChange();
+    return { ...queued, meta: buildMeta({ offline: true }) };
+  }
+
+  if (method === 'GET' && cacheKey) {
+    if (!navigator.onLine) {
+      const cached = await readCachedGet(url);
+      if (cached) return cached;
+      throw new Error('You are offline and this data is not cached yet. Connect to Wi‑Fi once to download it.');
+    }
+
+    try {
+      const response = await requestDirect(method, url, body);
+      if (url === '/api/auth/status' && response.data?.authenticated) {
+        await saveSession({
+          authenticated: true,
+          admin: Boolean(response.data.admin),
+          user: response.data.user,
+        });
+      }
+      await writeCachedGet(url, response.data, response.status);
+      return { ...response, meta: buildMeta() };
+    } catch (error) {
+      if (error.response?.status === 404) {
+        await writeCachedGet(url, error.response.data, 404);
+      }
+      const cached = await readCachedGet(url).catch(() => null);
+      if (cached) return cached;
+      throw error;
+    }
+  }
+
+  if (!navigator.onLine) {
+    throw new Error('You are offline. Connect to Wi‑Fi to complete this action.');
+  }
+
+  try {
+    const response = await requestDirect(method, url, body);
+
+    if (url === '/api/auth/status' && response.data?.authenticated) {
+      await saveSession({
+        authenticated: true,
+        admin: Boolean(response.data.admin),
+        user: response.data.user,
+      });
+    }
+
+    if (method === 'GET' && cacheKey) {
+      await writeCachedGet(url, response.data, response.status);
+    }
+
+    if (offlineWrite && (method === 'POST' || method === 'PUT')) {
+      await writeCachedGet(
+        offlineWrite.resourceType === RESOURCE_TYPES.COMMITTEE_SUBMISSION
+          ? '/api/committee-submissions'
+          : '/api/workshop-submissions',
+        response.data,
+        response.status
+      );
+    }
+
+    if (offlineWrite && method === 'DELETE') {
+      const deleteCacheUrl = offlineWrite.resourceType === RESOURCE_TYPES.COMMITTEE_SUBMISSION
+        ? '/api/committee-submissions'
+        : '/api/workshop-submissions';
+      await writeCachedGet(deleteCacheUrl, null, 404);
+    }
+
+    if (url === '/api/auth/logout') {
+      await clearSession();
+    }
+
+    return { ...response, meta: buildMeta() };
+  } catch (error) {
+    if (method === 'GET' && cacheKey) {
+      const cached = await readCachedGet(url).catch(() => null);
+      if (cached) return cached;
+    }
+    throw error;
+  }
+}
+
+export const syncRequest = (method, url, body) => requestDirect(method, url, body);
+
+export const restoreCachedAuth = async () => {
+  const session = await getCachedSession();
+  if (session?.authenticated) {
+    return {
+      authenticated: true,
+      admin: Boolean(session.admin),
+      user: session.user,
+    };
+  }
+  return null;
+};
+
+export const saveOfflineSessionFromLogin = async (user) => {
+  await saveSession({
+    authenticated: true,
+    admin: Boolean(user?.admin),
+    user: {
+      username: user?.username,
+      admin: Boolean(user?.admin),
+      userType: user?.userType,
+    },
+  });
+};
+
+const api = {
+  get: (url) => request('GET', url),
+  post: (url, body) => request('POST', url, body),
+  put: (url, body) => request('PUT', url, body),
+  delete: (url) => request('DELETE', url),
+};
+
+export default api;

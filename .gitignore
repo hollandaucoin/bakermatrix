@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Production build (rebuilt on deploy)
+build/
+
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs & debug
+npm-debug.log*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Test / cache
+coverage/
+.eslintcache

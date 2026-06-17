@@ -1,0 +1,782 @@
+import React, { useState, useEffect } from 'react';
+import { exportWorkshopSubmissions, exportWorkshopEnrollments } from '../util/pdfExports.js';
+import api from '../util/api.js';
+import { fetchCouncilNumberByCounselorName, formatCounselorWithCouncil } from '../util/council.js';
+
+const WorkshopAdminPage = () => {
+  const [activeTab, setActiveTab] = useState('submissions'); // 'submissions' or 'workshops'
+  const [submissions, setSubmissions] = useState([]);
+  const [seniorCounselors, setSeniorCounselors] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (activeTab === 'submissions') {
+      fetchSubmissions();
+      fetchSeniorCounselors();
+    } else {
+      fetchEnrollments();
+    }
+  }, [activeTab]);
+
+  const fetchSubmissions = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.get('/api/workshop-submissions/admin/all');
+      setSubmissions(data);
+    } catch (err) {
+      console.error('Error fetching submissions:', err);
+      setError('Failed to load workshop submissions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSeniorCounselors = async () => {
+    try {
+      const { data } = await api.get('/api/seniorcounselors');
+      setSeniorCounselors(data);
+    } catch (err) {
+      console.error('Error fetching senior counselors:', err);
+      // Don't set error here, just log it - submissions are more important
+    }
+  };
+
+  const fetchEnrollments = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.get('/api/workshops/admin/enrollments');
+      setEnrollments(data);
+    } catch (err) {
+      console.error('Error fetching enrollments:', err);
+      setError('Failed to load workshop enrollments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewSubmission = async (submissionId) => {
+    try {
+      const { data } = await api.get(`/api/workshop-submissions/admin/${submissionId}`);
+      setSelectedSubmission(data);
+    } catch (err) {
+      console.error('Error fetching submission details:', err);
+      setError('Failed to load submission details');
+    }
+  };
+
+  const handleExportSubmissions = () => {
+    exportWorkshopSubmissions(submissions);
+  };
+
+  const handleExportEnrollments = () => {
+    exportWorkshopEnrollments(enrollments);
+  };
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h1 style={styles.title}>Workshops</h1>
+        <p style={styles.description}>
+          Manage and view workshop submissions from Senior Counselors.
+        </p>
+      </div>
+
+      {error && (
+        <div style={styles.errorMessage}>
+          {error}
+        </div>
+      )}
+
+      <div style={styles.tabs}>
+        <button
+          onClick={() => setActiveTab('submissions')}
+          style={{
+            ...styles.tab,
+            ...(activeTab === 'submissions' ? styles.activeTab : {})
+          }}
+        >
+          Submissions
+        </button>
+        <button
+          onClick={() => setActiveTab('workshops')}
+          style={{
+            ...styles.tab,
+            ...(activeTab === 'workshops' ? styles.activeTab : {})
+          }}
+        >
+          Workshop Lists
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={styles.loading}>Loading...</div>
+      ) : activeTab === 'submissions' ? (
+        <SubmissionsView
+          submissions={submissions}
+          seniorCounselors={seniorCounselors}
+          selectedSubmission={selectedSubmission}
+          onViewSubmission={handleViewSubmission}
+          onCloseSubmission={() => setSelectedSubmission(null)}
+          onExport={handleExportSubmissions}
+        />
+      ) : (
+        <EnrollmentsView enrollments={enrollments} onExport={handleExportEnrollments} />
+      )}
+    </div>
+  );
+};
+
+const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, onViewSubmission, onCloseSubmission, onExport }) => {
+  if (selectedSubmission) {
+    return (
+      <div style={styles.content}>
+        <div style={styles.headerRow}>
+          <h2 style={styles.subtitle}>
+            {selectedSubmission._seniorCounselor?.name || selectedSubmission._seniorCounselor?.username || 'Unknown'}
+          </h2>
+          <button onClick={onCloseSubmission} style={styles.backButton}>
+            ← Back to List
+          </button>
+        </div>
+        <p style={styles.meta}>
+          Last updated: {new Date(selectedSubmission.updatedAt).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })}
+        </p>
+        
+        <div style={styles.tableSection}>
+          <div style={{...styles.tableHeader, gridTemplateColumns: '1fr 1fr 1fr'}}>
+            <div style={styles.tableHeaderCell}>Name</div>
+            <div style={styles.tableHeaderCell}>Workshop 1</div>
+            <div style={styles.tableHeaderCell}>Workshop 2</div>
+          </div>
+          
+          {selectedSubmission.assignments.map((assignment, index) => (
+            <div key={index} style={{...styles.tableRow, gridTemplateColumns: '1fr 1fr 1fr'}}>
+              <div style={styles.tableCell}>{assignment.name}</div>
+              <div style={styles.tableCell}>
+                {assignment.workshop1?.name || 'N/A'}
+              </div>
+              <div style={styles.tableCell}>
+                {assignment.workshop2?.name || 'N/A'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Create a map of submissions by senior counselor ID
+  const submissionsByCounselor = {};
+  submissions.forEach(submission => {
+    if (submission._seniorCounselor) {
+      submissionsByCounselor[submission._seniorCounselor._id.toString()] = submission;
+    }
+  });
+
+  // Get counts
+  const submittedCount = Object.keys(submissionsByCounselor).length;
+  const totalCount = seniorCounselors.length;
+  const missingCount = totalCount - submittedCount;
+  const canExport = submissions.length > 0;
+
+  return (
+    <div style={styles.content}>
+      <div style={styles.statsBar}>
+        <div style={styles.statsGroup}>
+          <div style={styles.stat}>
+            <span style={styles.statLabel}>Total Senior Counselors:</span>
+            <span style={styles.statValue}>{totalCount}</span>
+          </div>
+          <div style={styles.stat}>
+            <span style={styles.statLabel}>Submitted:</span>
+            <span style={{...styles.statValue, color: '#10b981'}}>{submittedCount}</span>
+          </div>
+          <div style={styles.stat}>
+            <span style={styles.statLabel}>Missing:</span>
+            <span style={{...styles.statValue, color: '#ef4444'}}>{missingCount}</span>
+          </div>
+        </div>
+        <button
+          onClick={onExport}
+          disabled={!canExport}
+          style={{
+            ...styles.statsExportButton,
+            ...(!canExport ? styles.exportButtonDisabled : {}),
+          }}
+          title={!canExport ? 'No submissions to export' : 'Export all submissions as PDF'}
+        >
+          📄 Export PDF
+        </button>
+      </div>
+
+      <div style={styles.tableSection}>
+        <div style={styles.tableHeader}>
+          <div style={styles.tableHeaderCell}>Senior Counselor</div>
+          <div style={styles.tableHeaderCell}>Status</div>
+          <div style={styles.tableHeaderCell}>Assignments</div>
+          <div style={styles.tableHeaderCell}>Last Updated</div>
+          <div style={styles.tableHeaderCell}>Actions</div>
+        </div>
+        
+        {seniorCounselors.map(counselor => {
+          const submission = submissionsByCounselor[counselor._id.toString()];
+          const hasSubmitted = !!submission;
+          
+          return (
+            <div key={counselor._id} style={styles.tableRow}>
+              <div style={styles.tableCell}>
+                {counselor.name || counselor.username || 'Unknown'}
+              </div>
+              <div style={styles.tableCell}>
+                {hasSubmitted ? (
+                  <span style={styles.statusBadgeSubmitted}>Submitted</span>
+                ) : (
+                  <span style={styles.statusBadgeMissing}>Missing</span>
+                )}
+              </div>
+              <div style={styles.tableCell}>
+                {hasSubmitted ? (submission.assignments?.length || 0) + ' assignment(s)' : '-'}
+              </div>
+              <div style={styles.tableCell}>
+                {hasSubmitted ? new Date(submission.updatedAt).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                }) : '-'}
+              </div>
+              <div style={styles.tableCell}>
+                {hasSubmitted ? (
+                  <div style={styles.actionButtons}>
+                    <button
+                      onClick={() => onViewSubmission(submission._id)}
+                      style={styles.viewButton}
+                      title="View Details"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f1f5f9';
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }}
+                    >
+                      👀
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        exportWorkshopSubmissions(submission);
+                      }}
+                      style={styles.exportButton}
+                      title="Export PDF"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f1f5f9';
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                      }}
+                    >
+                      📄
+                    </button>
+                  </div>
+                ) : (
+                  <span style={styles.noAction}>-</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const EnrollmentsView = ({ enrollments, onExport }) => {
+  const [selectedWorkshop, setSelectedWorkshop] = useState(null);
+  const [councilByName, setCouncilByName] = useState({});
+
+  useEffect(() => {
+    fetchCouncilNumberByCounselorName().then(setCouncilByName);
+  }, []);
+
+  if (enrollments.length === 0) {
+    return (
+      <div style={styles.content}>
+        <p style={styles.emptyMessage}>No workshop enrollments found</p>
+      </div>
+    );
+  }
+
+  if (selectedWorkshop) {
+    const workshop = enrollments.find(e => e.workshop._id === selectedWorkshop);
+    return (
+      <div style={styles.content}>
+        <div style={styles.headerRow}>
+          <h2 style={styles.subtitle}>{workshop.workshop.name}</h2>
+          <button onClick={() => setSelectedWorkshop(null)} style={styles.backButton}>
+            ← Back to List
+          </button>
+        </div>
+
+        <div style={styles.enrollmentSection}>
+          <div style={styles.sessionSection}>
+            <h3 style={styles.sessionTitle}>
+              Session 1 ({workshop.session1Count} {workshop.session1Count === 1 ? 'person' : 'people'})
+            </h3>
+            {workshop.session1.length === 0 ? (
+              <p style={styles.emptyMessage}>No enrollments</p>
+            ) : (
+              <div style={styles.nameList}>
+                {workshop.session1.map((item, index) => (
+                  <div key={index} style={styles.nameItem}>
+                    <span style={styles.name}>{item.name}</span>
+                    {item.seniorCounselor && (
+                      <span style={styles.counselor}>
+                        ({formatCounselorWithCouncil(item.seniorCounselor, councilByName)})
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={styles.sessionSection}>
+            <h3 style={styles.sessionTitle}>
+              Session 2 ({workshop.session2Count} {workshop.session2Count === 1 ? 'person' : 'people'})
+            </h3>
+            {workshop.session2.length === 0 ? (
+              <p style={styles.emptyMessage}>No enrollments</p>
+            ) : (
+              <div style={styles.nameList}>
+                {workshop.session2.map((item, index) => (
+                  <div key={index} style={styles.nameItem}>
+                    <span style={styles.name}>{item.name}</span>
+                    {item.seniorCounselor && (
+                      <span style={styles.counselor}>
+                        ({formatCounselorWithCouncil(item.seniorCounselor, councilByName)})
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.content}>
+      <div style={styles.statsBar}>
+        <div style={{ flex: 1 }}></div>
+        <button
+          onClick={onExport}
+          style={styles.statsExportButton}
+          title="Export all enrollments as PDF"
+        >
+          📄 Export PDF
+        </button>
+      </div>
+      <div style={styles.tableSection}>
+        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr'}}>
+          <div style={styles.tableHeaderCell}>Workshop</div>
+          <div style={styles.tableHeaderCell}>Session 1</div>
+          <div style={styles.tableHeaderCell}>Session 2</div>
+          <div style={styles.tableHeaderCell}>Total</div>
+          <div style={styles.tableHeaderCell}>Actions</div>
+        </div>
+        
+        {enrollments.map(enrollment => (
+          <div key={enrollment.workshop._id} style={{...styles.tableRow, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr'}}>
+            <div style={styles.tableCell}>
+              <strong>{enrollment.workshop.name}</strong>
+            </div>
+            <div style={styles.tableCell}>
+              {enrollment.session1Count}
+            </div>
+            <div style={styles.tableCell}>
+              {enrollment.session2Count}
+            </div>
+            <div style={styles.tableCell}>
+              <strong>{enrollment.totalCount}</strong>
+            </div>
+            <div style={styles.tableCell}>
+              <div style={styles.actionButtons}>
+                <button
+                  onClick={() => setSelectedWorkshop(enrollment.workshop._id)}
+                  style={styles.viewButton}
+                  title="View Details"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#c7d2fe';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#e0e7ff';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                  }}
+                >
+                  👀
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    exportWorkshopEnrollments(enrollment);
+                  }}
+                  style={styles.exportButton}
+                  title="Export PDF"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#bbf7d0';
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px 0 rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dcfce7';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+                  }}
+                >
+                  📄
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const styles = {
+  container: {
+    padding: '2rem',
+    maxWidth: '1400px',
+    margin: '0 auto',
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '2rem',
+    padding: '1.5rem 0',
+  },
+  title: {
+    fontSize: '2.5rem',
+    fontWeight: '800',
+    color: '#0f172a',
+    margin: '0 0 0.5rem 0',
+    letterSpacing: '-0.025em',
+    background: 'linear-gradient(135deg, #1e293b 0%, #3b82f6 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+  },
+  description: {
+    fontSize: '1.125rem',
+    color: '#64748b',
+    margin: '0',
+    fontWeight: '400',
+    lineHeight: '1.6',
+  },
+  errorMessage: {
+    padding: '1rem 1.25rem',
+    borderRadius: '10px',
+    marginBottom: '2rem',
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    border: '1px solid #fecaca',
+    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    fontWeight: '500',
+  },
+  tabs: {
+    display: 'flex',
+    gap: '0.5rem',
+    marginBottom: '2rem',
+    borderBottom: '2px solid #e2e8f0',
+  },
+  tab: {
+    padding: '0.75rem 1.5rem',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    color: '#64748b',
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderBottom: '3px solid transparent',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+    marginBottom: '-2px',
+  },
+  activeTab: {
+    color: '#3b82f6',
+    borderBottomColor: '#3b82f6',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem',
+    color: '#64748b',
+    fontSize: '1.125rem',
+  },
+  content: {
+    backgroundColor: 'white',
+    padding: '2rem',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
+  },
+  headerRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1.5rem',
+    gap: '1rem',
+  },
+  subtitle: {
+    fontSize: '1.5rem',
+    fontWeight: '600',
+    color: '#1e293b',
+    margin: 0,
+  },
+  meta: {
+    fontSize: '0.875rem',
+    color: '#94a3b8',
+    margin: '0 0 1.5rem 0',
+    fontStyle: 'italic',
+  },
+  backButton: {
+    padding: '0.5rem 1rem',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    backgroundColor: '#f1f5f9',
+    color: '#475569',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+  },
+  tableSection: {
+    width: '100%',
+    marginTop: '0',
+  },
+  statsBar: {
+    display: 'flex',
+    padding: '1rem 1.5rem',
+    backgroundColor: '#f8fafc',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+    marginBottom: '1.5rem',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statsExportButton: {
+    padding: '0.75rem 1.5rem',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  exportButtonDisabled: {
+    opacity: 0.55,
+    cursor: 'not-allowed',
+    background: '#e2e8f0',
+    color: '#94a3b8',
+    boxShadow: 'none',
+  },
+  statsGroup: {
+    display: 'flex',
+    gap: '2rem',
+    alignItems: 'center',
+  },
+  stat: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '1.25rem',
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: '0.75rem',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    fontWeight: '600',
+  },
+  statValue: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  tableHeader: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr 1fr 1.5fr 1fr',
+    gap: '1rem',
+    padding: '1rem 1.5rem',
+    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
+    fontWeight: '600',
+    fontSize: '0.875rem',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  tableHeaderCell: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  tableRow: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr 1fr 1.5fr 1fr',
+    gap: '1rem',
+    padding: '1.25rem 1.5rem',
+    borderBottom: '1px solid #f1f5f9',
+    alignItems: 'center',
+    transition: 'background-color 0.2s ease-in-out',
+  },
+  tableCell: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  actionButtons: {
+    display: 'flex',
+    gap: '0.5rem',
+    alignItems: 'center',
+  },
+  viewButton: {
+    padding: '0.5rem 0.75rem',
+    fontSize: '1rem',
+    fontWeight: '500',
+    backgroundColor: '#f8fafc',
+    color: '#475569',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: '2.5rem',
+  },
+  exportButton: {
+    padding: '0.5rem 0.75rem',
+    fontSize: '1rem',
+    fontWeight: '500',
+    backgroundColor: '#f8fafc',
+    color: '#475569',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: '2.5rem',
+  },
+  statusBadgeSubmitted: {
+    padding: '0.375rem 0.75rem',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    backgroundColor: '#d1fae5',
+    color: '#065f46',
+    borderRadius: '6px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  statusBadgeMissing: {
+    padding: '0.375rem 0.75rem',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    borderRadius: '6px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  noAction: {
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  emptyMessage: {
+    textAlign: 'center',
+    padding: '2rem',
+    color: '#94a3b8',
+    fontSize: '1rem',
+  },
+  enrollmentSection: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '2rem',
+    marginTop: '1.5rem',
+  },
+  sessionSection: {
+    backgroundColor: '#f8fafc',
+    padding: '1.5rem',
+    borderRadius: '10px',
+    border: '1px solid #e2e8f0',
+  },
+  sessionTitle: {
+    fontSize: '1.125rem',
+    fontWeight: '600',
+    color: '#1e293b',
+    margin: '0 0 1rem 0',
+    paddingBottom: '0.75rem',
+    borderBottom: '1px solid #e2e8f0',
+  },
+  nameList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+  },
+  nameItem: {
+    padding: '0.75rem',
+    backgroundColor: 'white',
+    borderRadius: '6px',
+    border: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  name: {
+    fontWeight: '500',
+    color: '#1e293b',
+  },
+  counselor: {
+    fontSize: '0.875rem',
+    color: '#64748b',
+    fontStyle: 'italic',
+  },
+};
+
+export default WorkshopAdminPage;
