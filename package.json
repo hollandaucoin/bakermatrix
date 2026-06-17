@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch lib/server.js",
-    "start": "react-scripts start",
+    "dev:client": "react-scripts start",
+    "start": "node lib/server.js",
     "build": "react-scripts build",
     "serve": "npm run build && node lib/server.js",
-    "dev:full": "concurrently \"npm run dev\" \"npm run start\""
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:client\""
   },
   "keywords": [],
   "author": "",
