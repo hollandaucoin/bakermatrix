@@ -32,6 +32,7 @@ const NotesPage = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [lastSaved, setLastSaved] = useState(null);
+  const [cacheInfo, setCacheInfo] = useState(null);
 
   const {
     registerGuard,
@@ -50,6 +51,14 @@ const NotesPage = () => {
   }, []);
 
   useEffect(() => {
+    const handleSync = () => {
+      fetchNotes({ afterSync: true });
+    };
+    window.addEventListener('offline-sync-complete', handleSync);
+    return () => window.removeEventListener('offline-sync-complete', handleSync);
+  }, []);
+
+  useEffect(() => {
     return registerGuard({ hasUnsavedChanges });
   }, [hasUnsavedChanges, registerGuard]);
 
@@ -64,18 +73,30 @@ const NotesPage = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  const fetchNotes = async () => {
+  const fetchNotes = async ({ afterSync = false } = {}) => {
     try {
-      const { data } = await api.get('/api/notes');
+      const { data, meta } = await api.get('/api/notes');
       const loadedNotes = normalizeNotes(data);
       setNotes(loadedNotes);
       setSavedNotes(loadedNotes);
+      setCacheInfo(meta || null);
       if (data.updatedAt) {
         setLastSaved(new Date(data.updatedAt));
+      } else {
+        setLastSaved(null);
+      }
+
+      if (afterSync) {
+        setMessage({ type: 'success', text: 'Successfully uploaded your saved notes.' });
       }
     } catch (error) {
       console.error('Error fetching notes:', error);
       setMessage({ type: 'error', text: 'Error loading notes' });
+      setCacheInfo(error.fromCache ? {
+        fromCache: true,
+        cachedAt: error.cachedAt,
+        offline: !navigator.onLine,
+      } : null);
     } finally {
       setLoading(false);
     }
@@ -90,9 +111,19 @@ const NotesPage = () => {
   };
 
   const saveNotes = useCallback(async () => {
-    await api.put('/api/notes', notes);
+    const response = await api.put('/api/notes', notes);
     setSavedNotes({ ...notes });
-    setLastSaved(new Date());
+    setLastSaved(new Date(response.data?.updatedAt || Date.now()));
+    setCacheInfo(response.meta || null);
+
+    if (response.offline) {
+      setMessage({
+        type: 'success',
+        text: 'Saved locally. Will upload when you\'re back online.',
+      });
+      return;
+    }
+
     setMessage({ type: 'success', text: 'Notes saved successfully' });
   }, [notes]);
 
@@ -152,9 +183,24 @@ const NotesPage = () => {
       <div style={styles.header}>
         <h1 style={styles.title}>Notes</h1>
         <p style={styles.description}>
-          Write and edit notes for each day. Your notes are automatically saved when you click Save.
+          Write and edit notes for each day. Save works offline and uploads when you reconnect.
         </p>
       </div>
+
+      {cacheInfo?.fromCache && (
+        <div style={styles.cacheBanner}>
+          {cacheInfo.offline ? 'Offline' : 'Cached'} view
+          {cacheInfo.cachedAt && (
+            <> · last updated {new Date(cacheInfo.cachedAt).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })}</>
+          )}
+        </div>
+      )}
 
       {message.text && (
         <div style={{
@@ -256,6 +302,16 @@ const styles = {
     margin: '0',
     fontWeight: '400',
     lineHeight: '1.6',
+  },
+  cacheBanner: {
+    marginBottom: '1rem',
+    padding: '0.75rem 1rem',
+    borderRadius: '8px',
+    backgroundColor: '#fef3c7',
+    color: '#92400e',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    textAlign: 'center',
   },
   lastSaved: {
     fontSize: '0.875rem',

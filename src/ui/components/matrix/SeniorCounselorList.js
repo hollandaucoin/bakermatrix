@@ -81,33 +81,16 @@ const FormComponent = ({ formData, setFormData, schools, seniorCounselors, isEdi
   return (
     <form onSubmit={onSubmit}>
       <div style={styles.formGroup}>
-        <div style={styles.formRow}>
-          <div style={styles.formColumn}>
-            <label style={styles.formLabel}>Name *</label>
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              style={styles.formInput}
-              required
-              placeholder="Enter counselor name"
-            />
-          </div>
-          <div style={styles.formColumn}>
-            <label style={styles.formLabel}>Starting Year *</label>
-            <input
-              type="number"
-              name="startingYear"
-              value={formData.startingYear}
-              onChange={handleInputChange}
-              style={styles.formInput}
-              placeholder="Enter starting year (e.g., 2020)"
-              required
-              max={new Date().getFullYear()}
-            />
-          </div>
-        </div>
+        <label style={styles.formLabel}>Name *</label>
+        <input
+          type="text"
+          name="name"
+          value={formData.name}
+          onChange={handleInputChange}
+          style={styles.formInput}
+          required
+          placeholder="Enter counselor name"
+        />
       </div>
 
       <div style={styles.formGroup}>
@@ -336,15 +319,7 @@ const FormComponent = ({ formData, setFormData, schools, seniorCounselors, isEdi
   );
 };
 
-const getExperienceYears = (startingYear) => {
-  if (!startingYear) return 'N/A';
-  const currentYear = new Date().getFullYear();
-  let years = currentYear - startingYear;
-  if (startingYear < 2020) years -= 2;
-  return `${years} ${years === 1 ? 'year' : 'years'}`;
-};
-
-const SC_TABLE_COLUMNS = '1.5fr 1fr 1.25fr 0.75fr 1.1fr 1.1fr 50px';
+const SC_TABLE_COLUMNS = '1.5fr 1fr 1.25fr 1.1fr 1.1fr 50px';
 
 const SeniorCounselorList = ({ goBack, goNext, isFirst, isLast }) => {
   const [seniorCounselors, setSeniorCounselors] = useState([]);
@@ -363,7 +338,6 @@ const SeniorCounselorList = ({ goBack, goNext, isFirst, isLast }) => {
   const [formData, setFormData] = useState({
     name: '',
     gender: '',
-    startingYear: '',
     committee: '',
     committeeLead: false,
     federalWay: false,
@@ -546,7 +520,6 @@ const SeniorCounselorList = ({ goBack, goNext, isFirst, isLast }) => {
     try {
       const dataToSend = {
         ...formData,
-        startingYear: parseInt(formData.startingYear, 10),
         _associatedSchool: formData._associatedSchool || undefined,
         _previousSchools: formData._previousSchools?.length || undefined,
         _previousPostingPartner: formData._previousPostingPartner || undefined
@@ -575,7 +548,6 @@ const SeniorCounselorList = ({ goBack, goNext, isFirst, isLast }) => {
     try {
       const dataToSend = {
         ...formData,
-        startingYear: parseInt(formData.startingYear, 10),
         _associatedSchool: formData._associatedSchool || undefined,
         _previousSchools: formData._previousSchools?.length ? formData._previousSchools : undefined,
         _previousPostingPartner: formData._previousPostingPartner || undefined,
@@ -629,7 +601,6 @@ const SeniorCounselorList = ({ goBack, goNext, isFirst, isLast }) => {
     setFormData({
       name: counselor.name,
       gender: counselor.gender || '',
-      startingYear: counselor.startingYear || '',
       committee: counselor.committee || '',
       committeeLead: counselor.committeeLead || false,
       federalWay: counselor.federalWay || false,
@@ -655,7 +626,6 @@ const SeniorCounselorList = ({ goBack, goNext, isFirst, isLast }) => {
     setFormData({
       name: '',
       gender: '',
-      startingYear: '',
       committee: '',
       committeeLead: false,
       federalWay: false,
@@ -776,7 +746,6 @@ const SeniorCounselorList = ({ goBack, goNext, isFirst, isLast }) => {
                 <div>Name</div>
                 <div>Committee</div>
                 <div>School</div>
-                <div>Experience</div>
                 <div>JC #1</div>
                 <div>JC #2</div>
                 <div />
@@ -814,9 +783,6 @@ const SeniorCounselorList = ({ goBack, goNext, isFirst, isLast }) => {
                   </div>
                   <div style={styles.listTableCell}>
                     {seniorCounselor._associatedSchool?.name || '—'}
-                  </div>
-                  <div style={styles.listTableCell}>
-                    {getExperienceYears(seniorCounselor.startingYear)}
                   </div>
                   <div onClick={(e) => e.stopPropagation()}>
                     <select

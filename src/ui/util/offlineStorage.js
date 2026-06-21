@@ -10,6 +10,7 @@ export const CACHE_KEYS = {
   WORKSHOPS_LIST: 'workshops/list',
   COMMITTEE_SUBMISSION: 'committee/submission',
   WORKSHOP_SUBMISSION: 'workshop/submission',
+  NOTES: 'notes/data',
 };
 
 export const URL_CACHE_KEY = {
@@ -19,6 +20,7 @@ export const URL_CACHE_KEY = {
   '/api/workshops': CACHE_KEYS.WORKSHOPS_LIST,
   '/api/committee-submissions': CACHE_KEYS.COMMITTEE_SUBMISSION,
   '/api/workshop-submissions': CACHE_KEYS.WORKSHOP_SUBMISSION,
+  '/api/notes': CACHE_KEYS.NOTES,
 };
 
 const openDb = () => new Promise((resolve, reject) => {
@@ -144,7 +146,7 @@ const readAllOutboxItems = async () => runStore(OUTBOX_STORE, 'readonly', (store
   request.onerror = () => reject(request.error);
 }));
 
-const VALID_RESOURCE_TYPES = new Set(['committee-submission', 'workshop-submission']);
+const VALID_RESOURCE_TYPES = new Set(['committee-submission', 'workshop-submission', 'notes']);
 
 export const sanitizeOutbox = async () => {
   const items = await readAllOutboxItems();

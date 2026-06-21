@@ -1,7 +1,7 @@
 // Lightweight fetch-based API client with offline cache + submission outbox.
 //
 // GET requests to SC-facing endpoints are cached in IndexedDB.
-// POST/PUT/DELETE for committee/workshop submissions queue locally when offline.
+// POST/PUT/DELETE for committee/workshop submissions and PUT for notes queue locally when offline.
 
 import {
   URL_CACHE_KEY,
@@ -24,7 +24,14 @@ const OFFLINE_WRITE_ROUTES = [
   { match: /^\/api\/workshop-submissions\/?$/, method: 'POST', resourceType: RESOURCE_TYPES.WORKSHOP_SUBMISSION },
   { match: /^\/api\/workshop-submissions\/[^/]+$/, method: 'PUT', resourceType: RESOURCE_TYPES.WORKSHOP_SUBMISSION },
   { match: /^\/api\/workshop-submissions\/[^/]+$/, method: 'DELETE', resourceType: RESOURCE_TYPES.WORKSHOP_SUBMISSION },
+  { match: /^\/api\/notes\/?$/, method: 'PUT', resourceType: RESOURCE_TYPES.NOTES },
 ];
+
+const CACHE_URL_BY_RESOURCE = {
+  [RESOURCE_TYPES.COMMITTEE_SUBMISSION]: '/api/committee-submissions',
+  [RESOURCE_TYPES.WORKSHOP_SUBMISSION]: '/api/workshop-submissions',
+  [RESOURCE_TYPES.NOTES]: '/api/notes',
+};
 
 const getOfflineWriteConfig = (method, url) => {
   const path = url.split('?')[0];
@@ -183,20 +190,17 @@ async function requestInner(method, url, body) {
     }
 
     if (offlineWrite && (method === 'POST' || method === 'PUT')) {
-      await writeCachedGet(
-        offlineWrite.resourceType === RESOURCE_TYPES.COMMITTEE_SUBMISSION
-          ? '/api/committee-submissions'
-          : '/api/workshop-submissions',
-        response.data,
-        response.status
-      );
+      const cacheUrl = CACHE_URL_BY_RESOURCE[offlineWrite.resourceType];
+      if (cacheUrl) {
+        await writeCachedGet(cacheUrl, response.data, response.status);
+      }
     }
 
     if (offlineWrite && method === 'DELETE') {
-      const deleteCacheUrl = offlineWrite.resourceType === RESOURCE_TYPES.COMMITTEE_SUBMISSION
-        ? '/api/committee-submissions'
-        : '/api/workshop-submissions';
-      await writeCachedGet(deleteCacheUrl, null, 404);
+      const deleteCacheUrl = CACHE_URL_BY_RESOURCE[offlineWrite.resourceType];
+      if (deleteCacheUrl) {
+        await writeCachedGet(deleteCacheUrl, null, 404);
+      }
     }
 
     if (url === '/api/auth/logout') {

@@ -17,13 +17,14 @@ const OnlineOnly = ({ children, pageName = 'This page', isAdmin = false }) => {
         <p style={styles.message}>
           {isAdmin
             ? `${pageName} requires an internet connection. Connect to Wi‑Fi to use it.`
-            : `${pageName} requires an internet connection. Connect to Wi‑Fi to use it, or visit Matrix, Committees, or Workshops — those work offline.`}
+            : `${pageName} requires an internet connection. Connect to Wi‑Fi to use it, or visit Matrix, Committees, Workshops, or Notes — those work offline.`}
         </p>
         {!isAdmin && (
           <div style={styles.links}>
             <Link to="/matrix" style={styles.link}>Matrix</Link>
             <Link to="/committees" style={styles.link}>Committees</Link>
             <Link to="/workshops" style={styles.link}>Workshops</Link>
+            <Link to="/notes" style={styles.link}>Notes</Link>
           </div>
         )}
       </div>

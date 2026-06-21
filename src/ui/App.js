@@ -135,9 +135,7 @@ const App = () => {
         <Route path="/notes" element={
           <ProtectedRoute>
             <MainLayout onLogout={handleLogout} isAuthenticated={true} isAdmin={isAdmin}>
-              <OnlineOnly pageName="Notes" isAdmin={isAdmin}>
-                <NotesPage />
-              </OnlineOnly>
+              <NotesPage />
             </MainLayout>
           </ProtectedRoute>
         } />

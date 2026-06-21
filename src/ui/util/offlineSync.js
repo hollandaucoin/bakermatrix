@@ -11,11 +11,13 @@ import {
 export const RESOURCE_TYPES = {
   COMMITTEE_SUBMISSION: 'committee-submission',
   WORKSHOP_SUBMISSION: 'workshop-submission',
+  NOTES: 'notes',
 };
 
 const SUBMISSION_GET_URL = {
   [RESOURCE_TYPES.COMMITTEE_SUBMISSION]: '/api/committee-submissions',
   [RESOURCE_TYPES.WORKSHOP_SUBMISSION]: '/api/workshop-submissions',
+  [RESOURCE_TYPES.NOTES]: '/api/notes',
 };
 
 const buildOptimisticSubmission = (existing, body, resourceType) => {
@@ -61,11 +63,44 @@ const cacheKeyForResource = (resourceType) => {
   if (resourceType === RESOURCE_TYPES.WORKSHOP_SUBMISSION) {
     return CACHE_KEYS.WORKSHOP_SUBMISSION;
   }
+  if (resourceType === RESOURCE_TYPES.NOTES) {
+    return CACHE_KEYS.NOTES;
+  }
   return null;
 };
 
+const buildOptimisticNotes = (existing, body) => ({
+  ...(existing?.data || {}),
+  ...body,
+  updatedAt: new Date().toISOString(),
+  pendingSync: true,
+});
+
 export const queueOfflineWrite = async ({ method, url, body, resourceType }) => {
   const cacheKey = cacheKeyForResource(resourceType);
+
+  if (resourceType === RESOURCE_TYPES.NOTES) {
+    await clearOutboxForResourceType(resourceType);
+    await addOutboxItem({
+      method: 'PUT',
+      url: SUBMISSION_GET_URL[RESOURCE_TYPES.NOTES],
+      body,
+      resourceType,
+    });
+
+    const existing = cacheKey ? await getCacheEntry(cacheKey) : null;
+    const optimistic = buildOptimisticNotes(existing, body);
+    if (cacheKey) {
+      await setCacheEntry(cacheKey, {
+        data: optimistic,
+        status: 200,
+        updatedAt: Date.now(),
+      });
+    }
+
+    return { data: optimistic, status: 202, offline: true, queued: true };
+  }
+
   const existing = cacheKey ? await getCacheEntry(cacheKey) : null;
   const serverId = existing?.data?._id;
   const hasServerId = serverId && !String(serverId).startsWith('local-');
@@ -123,6 +158,10 @@ const applySyncResult = async (item, responseData, status) => {
 };
 
 const resolveSyncItem = async (item, requestFn) => {
+  if (item.resourceType === RESOURCE_TYPES.NOTES) {
+    return item;
+  }
+
   if (item.method !== 'POST') return item;
 
   const getUrl = SUBMISSION_GET_URL[item.resourceType];
