@@ -1,4 +1,5 @@
 import React from 'react';
+import { POPUP_MOBILE_STYLES } from './popupMobileStyles.js';
 
 const ConfirmPopup = ({
   title,
@@ -7,24 +8,26 @@ const ConfirmPopup = ({
   cancelLabel = 'CANCEL',
   loading = false,
   loadingLabel = '...',
+  destructive = false,
   onCancel,
   onConfirm,
 }) => (
-  <div style={styles.popupOverlay} onClick={loading ? undefined : onCancel}>
-    <div style={styles.popup} onClick={(e) => e.stopPropagation()}>
-      <div style={styles.popupHeader}>
-        <h2 style={styles.popupTitle}>{title}</h2>
+  <div style={styles.popupOverlay} className="app-popup-overlay" onClick={loading ? undefined : onCancel}>
+    <style>{POPUP_MOBILE_STYLES}</style>
+    <div style={styles.popup} className="app-popup" onClick={(e) => e.stopPropagation()}>
+      <div style={styles.popupHeader} className="popup-header">
+        <h2 style={styles.popupTitle} className="popup-title">{title}</h2>
         <button type="button" style={styles.closeButton} onClick={onCancel} disabled={loading}>×</button>
       </div>
-      <div style={styles.popupMessage}>{message}</div>
-      <div style={styles.popupFooter}>
-        <div style={styles.popupFooterRight}>
+      <div style={styles.popupMessage} className="popup-message">{message}</div>
+      <div style={styles.popupFooter} className="popup-footer">
+        <div style={styles.popupFooterRight} className="popup-footer-right">
           <button type="button" style={styles.cancelButton} onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </button>
           <button
             type="button"
-            style={styles.confirmButton}
+            style={destructive ? styles.destructiveButton : styles.confirmButton}
             onClick={onConfirm}
             disabled={loading}
           >
@@ -132,6 +135,20 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.39)',
+  },
+  destructiveButton: {
+    padding: '0.625rem 1.25rem',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    borderRadius: '8px',
+    border: 'none',
+    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+    color: 'white',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.39)',
   },
 };
 

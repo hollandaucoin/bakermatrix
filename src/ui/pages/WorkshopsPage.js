@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../util/api.js';
 import { useNavigationGuard } from '../context/NavigationGuardContext.js';
 import UnsavedChangesPopup from '../components/UnsavedChangesPopup.js';
+import ConfirmPopup from '../components/ConfirmPopup.js';
 
 const normalizeWorkshopRows = (rows) =>
   rows.map(({ name, workshop1, workshop2 }) => ({
@@ -19,6 +20,7 @@ const WorkshopsPage = () => {
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [existingSubmission, setExistingSubmission] = useState(null);
 
@@ -247,12 +249,15 @@ const WorkshopsPage = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!existingSubmission) {
       return;
     }
+    setShowDeleteConfirm(true);
+  };
 
-    if (!window.confirm('Are you sure you want to delete your workshop submission? This action cannot be undone.')) {
+  const handleDeleteConfirm = async () => {
+    if (!existingSubmission) {
       return;
     }
 
@@ -269,6 +274,7 @@ const WorkshopsPage = () => {
       }
       setExistingSubmission(null);
       applyRows([{ id: Date.now(), name: '', workshop1: '', workshop2: '' }]);
+      setShowDeleteConfirm(false);
     } catch (error) {
       console.error('Error deleting workshop submission:', error);
       setMessage({ type: 'error', text: error.message || 'Error deleting workshop submission' });
@@ -553,7 +559,7 @@ const WorkshopsPage = () => {
             <div style={styles.actionButtons} className="action-buttons">
               {existingSubmission && (
                 <button
-                  onClick={handleDelete}
+                  onClick={handleDeleteClick}
                   style={styles.deleteButton}
                   className="delete-button"
                   disabled={deleting || loading}
@@ -577,6 +583,21 @@ const WorkshopsPage = () => {
           </div>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmPopup
+          title="Delete Workshop Submission?"
+          message="Are you sure you want to delete your workshop submission? This action cannot be undone."
+          confirmLabel="DELETE"
+          loadingLabel="DELETING..."
+          loading={deleting}
+          destructive
+          onCancel={() => {
+            if (!deleting) setShowDeleteConfirm(false);
+          }}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
 
       {pendingNavigation && (
         <UnsavedChangesPopup

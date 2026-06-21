@@ -1,10 +1,13 @@
-const CACHE_VERSION = 'bakermatrix-v10';
+const CACHE_VERSION = 'bakermatrix-v11';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
+  '/icons/favicon-16.png',
+  '/icons/favicon-32.png',
+  '/icons/apple-touch-icon.png',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {

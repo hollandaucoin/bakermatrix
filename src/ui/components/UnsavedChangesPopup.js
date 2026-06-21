@@ -1,4 +1,5 @@
 import React from 'react';
+import { POPUP_MOBILE_STYLES } from './popupMobileStyles.js';
 
 const UnsavedChangesPopup = ({
   title,
@@ -9,32 +10,11 @@ const UnsavedChangesPopup = ({
   onDiscard,
   onSave,
 }) => (
-  <div style={styles.popupOverlay} onClick={onCancel}>
-    <style>
-      {`
-        @media (max-width: 768px) {
-          .unsaved-changes-popup .popup-footer-right {
-            flex-direction: column !important;
-            align-items: stretch !important;
-          }
-          .unsaved-changes-popup .popup-footer-right button {
-            width: 100% !important;
-          }
-          .unsaved-changes-popup .popup-header {
-            padding: 1rem 1rem 0 1rem !important;
-          }
-          .unsaved-changes-popup .popup-message {
-            padding: 0 1rem !important;
-          }
-          .unsaved-changes-popup .popup-footer {
-            padding: 1rem !important;
-          }
-        }
-      `}
-    </style>
-    <div style={styles.popup} className="unsaved-changes-popup" onClick={(e) => e.stopPropagation()}>
+  <div style={styles.popupOverlay} className="app-popup-overlay" onClick={onCancel}>
+    <style>{POPUP_MOBILE_STYLES}</style>
+    <div style={styles.popup} className="app-popup unsaved-changes-popup" onClick={(e) => e.stopPropagation()}>
       <div style={styles.popupHeader} className="popup-header">
-        <h2 style={styles.popupTitle}>{title}</h2>
+        <h2 style={styles.popupTitle} className="popup-title">{title}</h2>
         <button type="button" style={styles.closeButton} onClick={onCancel}>×</button>
       </div>
       <p style={styles.popupMessage} className="popup-message">{message}</p>

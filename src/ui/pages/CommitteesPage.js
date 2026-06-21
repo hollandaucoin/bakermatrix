@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../util/api.js';
 import { useNavigationGuard } from '../context/NavigationGuardContext.js';
 import UnsavedChangesPopup from '../components/UnsavedChangesPopup.js';
+import ConfirmPopup from '../components/ConfirmPopup.js';
 
 const normalizeCommitteeRows = (rows) =>
   rows.map(({ name, committee }) => ({ name: name.trim(), committee }));
@@ -15,6 +16,7 @@ const CommitteesPage = () => {
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [existingSubmission, setExistingSubmission] = useState(null);
 
@@ -231,12 +233,15 @@ const CommitteesPage = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!existingSubmission) {
       return;
     }
+    setShowDeleteConfirm(true);
+  };
 
-    if (!window.confirm('Are you sure you want to delete your committee submission? This action cannot be undone.')) {
+  const handleDeleteConfirm = async () => {
+    if (!existingSubmission) {
       return;
     }
 
@@ -253,6 +258,7 @@ const CommitteesPage = () => {
       }
       setExistingSubmission(null);
       applyRows([{ id: Date.now(), name: '', committee: '' }]);
+      setShowDeleteConfirm(false);
     } catch (error) {
       console.error('Error deleting committee submission:', error);
       setMessage({ type: 'error', text: error.message || 'Error deleting committee submission' });
@@ -517,7 +523,7 @@ const CommitteesPage = () => {
             <div style={styles.actionButtons} className="action-buttons">
               {existingSubmission && (
                 <button
-                  onClick={handleDelete}
+                  onClick={handleDeleteClick}
                   style={styles.deleteButton}
                   className="delete-button"
                   disabled={deleting || loading}
@@ -541,6 +547,21 @@ const CommitteesPage = () => {
           </div>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmPopup
+          title="Delete Committee Submission?"
+          message="Are you sure you want to delete your committee submission? This action cannot be undone."
+          confirmLabel="DELETE"
+          loadingLabel="DELETING..."
+          loading={deleting}
+          destructive
+          onCancel={() => {
+            if (!deleting) setShowDeleteConfirm(false);
+          }}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
 
       {pendingNavigation && (
         <UnsavedChangesPopup
