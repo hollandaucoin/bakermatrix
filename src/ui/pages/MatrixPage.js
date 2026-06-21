@@ -99,7 +99,7 @@ const MatrixPage = () => {
 
   if (isLoading) {
     return (
-      <div style={styles.container}>
+      <div style={styles.container} className="matrix-page">
         <div style={styles.loadingContainer}>
           <div style={styles.spinner}></div>
           <p style={styles.loadingText}>Loading matrix...</p>
@@ -108,11 +108,176 @@ const MatrixPage = () => {
     );
   }
 
+  const renderCouncilCards = () => (
+    <div className="matrix-cards-mobile">
+      {currentMatrix.councils?.map((council, index) => (
+        <React.Fragment key={index}>
+          <div className="matrix-council-card">
+            <div className="matrix-council-card-header">
+              <span className="matrix-council-number">Council {council.number}</span>
+              <span className="matrix-council-room">{council.room}</span>
+            </div>
+
+            <div className="matrix-council-field">
+              <div className="matrix-council-label">Schools</div>
+              <div style={styles.schoolsList}>
+                {council.schools?.map((school, i) => (
+                  <div key={i} style={styles.schoolItem}>
+                    {school.replace(/High School/gi, 'HS')}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="matrix-council-field">
+              <div className="matrix-council-label">Senior Counselor</div>
+              <div>
+                <div>{council.seniorCounselor}</div>
+                {council.scPostingDorm?.partner && (
+                  <div style={styles.scPartner}>({council.scPostingDorm.partner})</div>
+                )}
+              </div>
+            </div>
+
+            <div className="matrix-council-field">
+              <div className="matrix-council-label">Junior Counselor(s)</div>
+              <div style={styles.jcList}>
+                {council.juniorCounselors?.map((jc, i) => (
+                  <div key={i} style={styles.jcName}>{jc.name}</div>
+                ))}
+              </div>
+            </div>
+
+            <div className="matrix-council-field">
+              <div className="matrix-council-label">JC Dorm(s)</div>
+              <div style={styles.jcList}>
+                {council.juniorCounselors?.map((jc, i) => (
+                  <div key={i} style={styles.jcDorm}>{jc.dorm}</div>
+                ))}
+              </div>
+            </div>
+
+            <div className="matrix-council-field">
+              <div className="matrix-council-label">SC Posting Dorm</div>
+              <div>
+                {council.scPostingDorm ? (
+                  <>
+                    <div style={styles.scDormName}>{council.scPostingDorm.name}</div>
+                    <div style={styles.scDormJcs}>{council.scPostingDorm.jcs}</div>
+                  </>
+                ) : (
+                  '-'
+                )}
+              </div>
+            </div>
+          </div>
+
+          {currentMatrix.balance?.group1?.size === council.number && index < currentMatrix.councils.length - 1 && (
+            <div style={styles.halfDividerMobile} className="matrix-half-divider">
+              — Camp Split —
+            </div>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Matrix</h1>
-        <p style={styles.subtitle}>View the selected matrix</p>
+    <div style={styles.container} className="matrix-page">
+      <style>
+        {`
+          .matrix-page .matrix-cards-mobile {
+            display: none;
+          }
+          @media (max-width: 768px) {
+            .matrix-page {
+              padding: 1rem !important;
+              max-width: 100% !important;
+              box-sizing: border-box !important;
+            }
+            .matrix-page .page-header {
+              margin-bottom: 0 !important;
+              padding: 0.5rem 0 !important;
+            }
+            .matrix-page .page-title {
+              font-size: 1.75rem !important;
+            }
+            .matrix-page .page-subtitle {
+              font-size: 1rem !important;
+            }
+            .matrix-page .download-button-container {
+              justify-content: stretch !important;
+            }
+            .matrix-page .download-button {
+              width: 100% !important;
+            }
+            .matrix-page .matrix-section {
+              padding: 1rem !important;
+            }
+            .matrix-page .matrix-table-desktop {
+              display: none !important;
+            }
+            .matrix-page .matrix-cards-mobile {
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 0.75rem !important;
+            }
+            .matrix-page .matrix-council-card {
+              border: 1px solid #e2e8f0;
+              border-radius: 10px;
+              padding: 1rem;
+              background: #ffffff;
+            }
+            .matrix-page .matrix-council-card-header {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 0.75rem;
+              margin-bottom: 0.75rem;
+              padding-bottom: 0.75rem;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            .matrix-page .matrix-council-number {
+              font-size: 0.8125rem;
+              font-weight: 700;
+              color: #1e293b;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+            .matrix-page .matrix-council-room {
+              font-size: 0.875rem;
+              font-weight: 600;
+              color: #475569;
+              text-align: right;
+            }
+            .matrix-page .matrix-council-field {
+              margin-bottom: 0.875rem;
+            }
+            .matrix-page .matrix-council-field:last-child {
+              margin-bottom: 0;
+            }
+            .matrix-page .matrix-council-label {
+              font-size: 0.75rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #64748b;
+              margin-bottom: 0.375rem;
+            }
+            .matrix-page .matrix-half-divider {
+              margin: 0.25rem 0 !important;
+              text-align: center !important;
+            }
+            .matrix-page .empty-state {
+              padding: 2.5rem 1rem !important;
+              margin-top: 1.5rem !important;
+            }
+          }
+        `}
+      </style>
+      <div style={styles.header} className="page-header">
+        <h1 style={styles.title} className="page-title">Matrix</h1>
+        <p style={styles.subtitle} className="page-subtitle">View the selected matrix</p>
       </div>
 
       {cacheInfo?.fromCache && (
@@ -132,9 +297,10 @@ const MatrixPage = () => {
 
       {/* Download Button */}
       {currentMatrix && (
-        <div style={styles.downloadButtonContainer}>
-          <button 
+        <div style={styles.downloadButtonContainer} className="download-button-container">
+          <button
             style={styles.actionButton}
+            className="download-button"
             onClick={() => downloadCSV(currentMatrix)}
           >
             💾 Download
@@ -142,11 +308,11 @@ const MatrixPage = () => {
         </div>
       )}
 
-      {/* Matrix Display */}
       {currentMatrix ? (
-        <div style={styles.section}>
-          {/* Table View */}
-          <div style={styles.tableContainer}>
+        <div style={styles.section} className="matrix-section">
+          {renderCouncilCards()}
+
+          <div style={styles.tableContainer} className="matrix-table-desktop">
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
@@ -223,7 +389,7 @@ const MatrixPage = () => {
           </div>
         </div>
       ) : !isLoading && !error ? (
-        <div style={styles.emptyState}>
+        <div style={styles.emptyState} className="empty-state">
           <div style={styles.emptyIcon}>⚖️</div>
           <h3 style={styles.emptyTitle}>No Matrix Selected</h3>
           <p style={styles.emptyMessage}>
@@ -409,6 +575,17 @@ const styles = {
     color: '#475569',
     backgroundColor: '#e2e8f0',
     textTransform: 'uppercase',
+  },
+  halfDividerMobile: {
+    padding: '0.5rem 0.75rem',
+    textAlign: 'center',
+    fontWeight: '700',
+    fontSize: '0.7rem',
+    letterSpacing: '0.05em',
+    color: '#475569',
+    backgroundColor: '#e2e8f0',
+    textTransform: 'uppercase',
+    borderRadius: '8px',
   },
   jcList: {
     display: 'flex',

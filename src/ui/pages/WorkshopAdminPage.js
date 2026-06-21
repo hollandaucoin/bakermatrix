@@ -78,10 +78,137 @@ const WorkshopAdminPage = () => {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Workshops</h1>
-        <p style={styles.description}>
+    <div style={styles.container} className="workshops-admin-page">
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .workshops-admin-page {
+              padding: 1rem !important;
+              max-width: 100% !important;
+              box-sizing: border-box !important;
+            }
+            .workshops-admin-page .page-header {
+              margin-bottom: 1.25rem !important;
+              padding: 0.5rem 0 !important;
+            }
+            .workshops-admin-page .page-title {
+              font-size: 1.75rem !important;
+            }
+            .workshops-admin-page .page-description {
+              font-size: 1rem !important;
+            }
+            .workshops-admin-page .admin-tabs {
+              margin-bottom: 1.25rem !important;
+            }
+            .workshops-admin-page .admin-tab {
+              flex: 1;
+              padding: 0.75rem 0.5rem !important;
+              text-align: center;
+            }
+            .workshops-admin-page .admin-content {
+              padding: 1rem !important;
+            }
+            .workshops-admin-page .admin-stats-bar {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 0.75rem !important;
+              padding: 1rem !important;
+            }
+            .workshops-admin-page .admin-stats-group {
+              flex-direction: column !important;
+              gap: 0.75rem !important;
+              width: 100% !important;
+            }
+            .workshops-admin-page .admin-stat {
+              justify-content: space-between !important;
+              width: 100% !important;
+            }
+            .workshops-admin-page .admin-stats-export {
+              width: 100% !important;
+              justify-content: center !important;
+            }
+            .workshops-admin-page .admin-table-header {
+              display: none !important;
+            }
+            .workshops-admin-page .admin-submission-row {
+              display: flex !important;
+              justify-content: space-between !important;
+              align-items: center !important;
+              gap: 0.75rem !important;
+              padding: 0.875rem 1rem !important;
+              grid-template-columns: none !important;
+            }
+            .workshops-admin-page .admin-submission-row-clickable {
+              cursor: pointer;
+            }
+            .workshops-admin-page .admin-submission-row-clickable:active {
+              background-color: #f8fafc;
+            }
+            .workshops-admin-page .admin-table-cell-extra {
+              display: none !important;
+            }
+            .workshops-admin-page .admin-table-cell-name {
+              flex: 1 !important;
+              min-width: 0 !important;
+              font-weight: 600 !important;
+            }
+            .workshops-admin-page .admin-enrollment-row {
+              display: flex !important;
+              justify-content: space-between !important;
+              align-items: center !important;
+              gap: 0.75rem !important;
+              padding: 0.875rem 1rem !important;
+              grid-template-columns: none !important;
+              cursor: pointer;
+            }
+            .workshops-admin-page .admin-enrollment-row:active {
+              background-color: #f8fafc;
+            }
+            .workshops-admin-page .admin-table-cell-count {
+              font-weight: 700 !important;
+              color: #1e293b !important;
+              flex-shrink: 0 !important;
+            }
+            .workshops-admin-page .admin-header-row {
+              flex-direction: column !important;
+              align-items: stretch !important;
+            }
+            .workshops-admin-page .admin-back-button {
+              width: 100% !important;
+            }
+            .workshops-admin-page .admin-enrollment-section {
+              grid-template-columns: 1fr !important;
+            }
+            .workshops-admin-page .admin-detail-table-header {
+              display: none !important;
+            }
+            .workshops-admin-page .admin-detail-row {
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 0.5rem !important;
+              padding: 0.875rem 1rem !important;
+              grid-template-columns: none !important;
+            }
+            .workshops-admin-page .admin-detail-cell::before {
+              content: attr(data-label);
+              font-size: 0.75rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #64748b;
+              margin-bottom: 0.25rem;
+            }
+            .workshops-admin-page .admin-name-item {
+              flex-direction: column !important;
+              align-items: flex-start !important;
+              gap: 0.25rem !important;
+            }
+          }
+        `}
+      </style>
+      <div style={styles.header} className="page-header">
+        <h1 style={styles.title} className="page-title">Workshops</h1>
+        <p style={styles.description} className="page-description">
           Manage and view workshop submissions from Senior Counselors.
         </p>
       </div>
@@ -92,13 +219,14 @@ const WorkshopAdminPage = () => {
         </div>
       )}
 
-      <div style={styles.tabs}>
+      <div style={styles.tabs} className="admin-tabs">
         <button
           onClick={() => setActiveTab('submissions')}
           style={{
             ...styles.tab,
             ...(activeTab === 'submissions' ? styles.activeTab : {})
           }}
+          className="admin-tab"
         >
           Submissions
         </button>
@@ -108,6 +236,7 @@ const WorkshopAdminPage = () => {
             ...styles.tab,
             ...(activeTab === 'workshops' ? styles.activeTab : {})
           }}
+          className="admin-tab"
         >
           Workshop Lists
         </button>
@@ -134,12 +263,12 @@ const WorkshopAdminPage = () => {
 const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, onViewSubmission, onCloseSubmission, onExport }) => {
   if (selectedSubmission) {
     return (
-      <div style={styles.content}>
-        <div style={styles.headerRow}>
+      <div style={styles.content} className="admin-content">
+        <div style={styles.headerRow} className="admin-header-row">
           <h2 style={styles.subtitle}>
             {selectedSubmission._seniorCounselor?.name || selectedSubmission._seniorCounselor?.username || 'Unknown'}
           </h2>
-          <button onClick={onCloseSubmission} style={styles.backButton}>
+          <button onClick={onCloseSubmission} style={styles.backButton} className="admin-back-button">
             ← Back to List
           </button>
         </div>
@@ -155,19 +284,19 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
         </p>
         
         <div style={styles.tableSection}>
-          <div style={{...styles.tableHeader, gridTemplateColumns: '1fr 1fr 1fr'}}>
+          <div style={{...styles.tableHeader, gridTemplateColumns: '1fr 1fr 1fr'}} className="admin-detail-table-header">
             <div style={styles.tableHeaderCell}>Name</div>
             <div style={styles.tableHeaderCell}>Workshop 1</div>
             <div style={styles.tableHeaderCell}>Workshop 2</div>
           </div>
           
           {selectedSubmission.assignments.map((assignment, index) => (
-            <div key={index} style={{...styles.tableRow, gridTemplateColumns: '1fr 1fr 1fr'}}>
-              <div style={styles.tableCell}>{assignment.name}</div>
-              <div style={styles.tableCell}>
+            <div key={index} style={{...styles.tableRow, gridTemplateColumns: '1fr 1fr 1fr'}} className="admin-detail-row">
+              <div style={styles.tableCell} className="admin-detail-cell" data-label="Name">{assignment.name}</div>
+              <div style={styles.tableCell} className="admin-detail-cell" data-label="Workshop 1">
                 {assignment.workshop1?.name || 'N/A'}
               </div>
-              <div style={styles.tableCell}>
+              <div style={styles.tableCell} className="admin-detail-cell" data-label="Workshop 2">
                 {assignment.workshop2?.name || 'N/A'}
               </div>
             </div>
@@ -192,18 +321,18 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
   const canExport = submissions.length > 0;
 
   return (
-    <div style={styles.content}>
-      <div style={styles.statsBar}>
-        <div style={styles.statsGroup}>
-          <div style={styles.stat}>
+    <div style={styles.content} className="admin-content">
+      <div style={styles.statsBar} className="admin-stats-bar">
+        <div style={styles.statsGroup} className="admin-stats-group">
+          <div style={styles.stat} className="admin-stat">
             <span style={styles.statLabel}>Total Senior Counselors:</span>
             <span style={styles.statValue}>{totalCount}</span>
           </div>
-          <div style={styles.stat}>
+          <div style={styles.stat} className="admin-stat">
             <span style={styles.statLabel}>Submitted:</span>
             <span style={{...styles.statValue, color: '#10b981'}}>{submittedCount}</span>
           </div>
-          <div style={styles.stat}>
+          <div style={styles.stat} className="admin-stat">
             <span style={styles.statLabel}>Missing:</span>
             <span style={{...styles.statValue, color: '#ef4444'}}>{missingCount}</span>
           </div>
@@ -215,6 +344,7 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
             ...styles.statsExportButton,
             ...(!canExport ? styles.exportButtonDisabled : {}),
           }}
+          className="admin-stats-export"
           title={!canExport ? 'No submissions to export' : 'Export all submissions as PDF'}
         >
           📄 Export PDF
@@ -222,7 +352,7 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
       </div>
 
       <div style={styles.tableSection}>
-        <div style={styles.tableHeader}>
+        <div style={styles.tableHeader} className="admin-table-header">
           <div style={styles.tableHeaderCell}>Senior Counselor</div>
           <div style={styles.tableHeaderCell}>Status</div>
           <div style={styles.tableHeaderCell}>Assignments</div>
@@ -235,8 +365,21 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
           const hasSubmitted = !!submission;
           
           return (
-            <div key={counselor._id} style={styles.tableRow}>
-              <div style={styles.tableCell}>
+            <div
+              key={counselor._id}
+              style={styles.tableRow}
+              className={`admin-submission-row${hasSubmitted ? ' admin-submission-row-clickable' : ''}`}
+              onClick={hasSubmitted ? () => onViewSubmission(submission._id) : undefined}
+              role={hasSubmitted ? 'button' : undefined}
+              tabIndex={hasSubmitted ? 0 : undefined}
+              onKeyDown={hasSubmitted ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onViewSubmission(submission._id);
+                }
+              } : undefined}
+            >
+              <div style={styles.tableCell} className="admin-table-cell-name">
                 {counselor.name || counselor.username || 'Unknown'}
               </div>
               <div style={styles.tableCell}>
@@ -246,10 +389,10 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
                   <span style={styles.statusBadgeMissing}>Missing</span>
                 )}
               </div>
-              <div style={styles.tableCell}>
+              <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
                 {hasSubmitted ? (submission.assignments?.length || 0) + ' assignment(s)' : '-'}
               </div>
-              <div style={styles.tableCell}>
+              <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
                 {hasSubmitted ? new Date(submission.updatedAt).toLocaleString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -259,11 +402,14 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
                   hour12: true
                 }) : '-'}
               </div>
-              <div style={styles.tableCell}>
+              <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
                 {hasSubmitted ? (
                   <div style={styles.actionButtons}>
                     <button
-                      onClick={() => onViewSubmission(submission._id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewSubmission(submission._id);
+                      }}
                       style={styles.viewButton}
                       title="View Details"
                       onMouseEnter={(e) => {
@@ -335,15 +481,15 @@ const EnrollmentsView = ({ enrollments, onExport }) => {
   if (selectedWorkshop) {
     const workshop = enrollments.find(e => e.workshop._id === selectedWorkshop);
     return (
-      <div style={styles.content}>
-        <div style={styles.headerRow}>
+      <div style={styles.content} className="admin-content">
+        <div style={styles.headerRow} className="admin-header-row">
           <h2 style={styles.subtitle}>{workshop.workshop.name}</h2>
-          <button onClick={() => setSelectedWorkshop(null)} style={styles.backButton}>
+          <button onClick={() => setSelectedWorkshop(null)} style={styles.backButton} className="admin-back-button">
             ← Back to List
           </button>
         </div>
 
-        <div style={styles.enrollmentSection}>
+        <div style={styles.enrollmentSection} className="admin-enrollment-section">
           <div style={styles.sessionSection}>
             <h3 style={styles.sessionTitle}>
               Session 1 ({workshop.session1Count} {workshop.session1Count === 1 ? 'person' : 'people'})
@@ -353,7 +499,7 @@ const EnrollmentsView = ({ enrollments, onExport }) => {
             ) : (
               <div style={styles.nameList}>
                 {workshop.session1.map((item, index) => (
-                  <div key={index} style={styles.nameItem}>
+                  <div key={index} style={styles.nameItem} className="admin-name-item">
                     <span style={styles.name}>{item.name}</span>
                     {item.seniorCounselor && (
                       <span style={styles.counselor}>
@@ -375,7 +521,7 @@ const EnrollmentsView = ({ enrollments, onExport }) => {
             ) : (
               <div style={styles.nameList}>
                 {workshop.session2.map((item, index) => (
-                  <div key={index} style={styles.nameItem}>
+                  <div key={index} style={styles.nameItem} className="admin-name-item">
                     <span style={styles.name}>{item.name}</span>
                     {item.seniorCounselor && (
                       <span style={styles.counselor}>
@@ -393,19 +539,20 @@ const EnrollmentsView = ({ enrollments, onExport }) => {
   }
 
   return (
-    <div style={styles.content}>
-      <div style={styles.statsBar}>
+    <div style={styles.content} className="admin-content">
+      <div style={styles.statsBar} className="admin-stats-bar">
         <div style={{ flex: 1 }}></div>
         <button
           onClick={onExport}
           style={styles.statsExportButton}
+          className="admin-stats-export"
           title="Export all enrollments as PDF"
         >
           📄 Export PDF
         </button>
       </div>
       <div style={styles.tableSection}>
-        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr'}}>
+        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr'}} className="admin-table-header">
           <div style={styles.tableHeaderCell}>Workshop</div>
           <div style={styles.tableHeaderCell}>Session 1</div>
           <div style={styles.tableHeaderCell}>Session 2</div>
@@ -414,23 +561,39 @@ const EnrollmentsView = ({ enrollments, onExport }) => {
         </div>
         
         {enrollments.map(enrollment => (
-          <div key={enrollment.workshop._id} style={{...styles.tableRow, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr'}}>
-            <div style={styles.tableCell}>
+          <div
+            key={enrollment.workshop._id}
+            style={{...styles.tableRow, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr'}}
+            className="admin-enrollment-row"
+            onClick={() => setSelectedWorkshop(enrollment.workshop._id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setSelectedWorkshop(enrollment.workshop._id);
+              }
+            }}
+          >
+            <div style={styles.tableCell} className="admin-table-cell-name">
               <strong>{enrollment.workshop.name}</strong>
             </div>
-            <div style={styles.tableCell}>
+            <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
               {enrollment.session1Count}
             </div>
-            <div style={styles.tableCell}>
+            <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
               {enrollment.session2Count}
             </div>
-            <div style={styles.tableCell}>
+            <div style={styles.tableCell} className="admin-table-cell-count">
               <strong>{enrollment.totalCount}</strong>
             </div>
-            <div style={styles.tableCell}>
+            <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
               <div style={styles.actionButtons}>
                 <button
-                  onClick={() => setSelectedWorkshop(enrollment.workshop._id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedWorkshop(enrollment.workshop._id);
+                  }}
                   style={styles.viewButton}
                   title="View Details"
                   onMouseEnter={(e) => {
@@ -666,7 +829,9 @@ const styles = {
   tableCell: {
     display: 'flex',
     alignItems: 'center',
+    minWidth: 0,
   },
+  tableCellExtra: {},
   actionButtons: {
     display: 'flex',
     gap: '0.5rem',

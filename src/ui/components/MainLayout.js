@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useNavigationGuard } from '../context/NavigationGuardContext.js';
 import OfflineStatusBar from './OfflineStatusBar.js';
@@ -7,11 +7,27 @@ const MainLayout = ({ children, onLogout, isAuthenticated = false, isAdmin = fal
   const location = useLocation();
   const navigate = useNavigate();
   const { requestNavigation } = useNavigationGuard();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   const handleNavigation = (event, path) => {
-    if (location.pathname === path) return;
+    if (location.pathname === path) {
+      setMenuOpen(false);
+      return;
+    }
     event.preventDefault();
+    setMenuOpen(false);
     requestNavigation(path, navigate);
+  };
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   const navigationItems = [
@@ -23,46 +39,112 @@ const MainLayout = ({ children, onLogout, isAuthenticated = false, isAdmin = fal
     { path: '/notes', label: 'Notes', icon: '📝' },
   ];
 
-  const handleLogout = () => {
-    if (onLogout) {
-      onLogout();
-    }
-  };
-
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="main-layout">
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .main-layout .header-content {
+              padding: 0 1rem !important;
+              height: 56px !important;
+            }
+            .main-layout .logo-text {
+              font-size: 1.125rem !important;
+            }
+            .main-layout .mobile-menu-button {
+              display: flex !important;
+            }
+            .main-layout .nav-container {
+              display: none !important;
+              position: absolute;
+              top: 100%;
+              left: 0;
+              right: 0;
+              flex-direction: column;
+              align-items: stretch;
+              gap: 0;
+              padding: 0.75rem;
+              background: white;
+              border-bottom: 1px solid #e2e8f0;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            }
+            .main-layout .nav-container-open {
+              display: flex !important;
+            }
+            .main-layout .navigation {
+              flex-direction: column;
+              align-items: stretch;
+              width: 100%;
+              gap: 0.25rem;
+            }
+            .main-layout .nav-link {
+              padding: 0.75rem 1rem !important;
+              border-radius: 8px !important;
+            }
+            .main-layout .logout-button {
+              width: 100%;
+              margin-top: 0.5rem;
+              padding: 0.75rem 1rem !important;
+            }
+            .main-layout .header {
+              position: sticky;
+            }
+          }
+        `}
+      </style>
       {/* Top Navigation Header */}
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
+      <header style={styles.header} className="header">
+        <div style={styles.headerContent} className="header-content">
           <div style={styles.logo}>
             <Link to="/" style={styles.logoLink} onClick={(e) => handleNavigation(e, '/')}>
-              <h1 style={styles.logoText}>⛰️ MT. BAKER</h1>
+              <h1 style={styles.logoText} className="logo-text">⛰️ MT. BAKER</h1>
             </Link>
           </div>
-          
+
           {isAuthenticated && (
-            <div style={styles.navContainer}>
-              <nav style={styles.navigation}>
-                {navigationItems.map(item => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={(e) => handleNavigation(e, item.path)}
-                    style={{
-                      ...styles.navLink,
-                      ...(location.pathname === item.path ? styles.navLinkActive : {})
-                    }}
-                  >
-                    <span style={styles.navIcon}>{item.icon}</span>
-                    <span style={styles.navLabel}>{item.label}</span>
-                  </Link>
-                ))}
-              </nav>
-              
-              <button onClick={handleLogout} style={styles.logoutButton}>
-                Sign Out
+            <>
+              <button
+                type="button"
+                className="mobile-menu-button"
+                style={styles.mobileMenuButton}
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-expanded={menuOpen}
+                aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              >
+                {menuOpen ? '✕' : '☰'}
               </button>
-            </div>
+              <div
+                style={styles.navContainer}
+                className={`nav-container${menuOpen ? ' nav-container-open' : ''}`}
+              >
+                <nav style={styles.navigation} className="navigation">
+                  {navigationItems.map(item => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={(e) => handleNavigation(e, item.path)}
+                      style={{
+                        ...styles.navLink,
+                        ...(location.pathname === item.path ? styles.navLinkActive : {}),
+                      }}
+                      className="nav-link"
+                    >
+                      <span style={styles.navIcon}>{item.icon}</span>
+                      <span style={styles.navLabel}>{item.label}</span>
+                    </Link>
+                  ))}
+                </nav>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  style={styles.logoutButton}
+                  className="logout-button"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </>
           )}
         </div>
       </header>
@@ -99,6 +181,22 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     height: '64px',
+    position: 'relative',
+  },
+  mobileMenuButton: {
+    display: 'none',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '40px',
+    height: '40px',
+    padding: 0,
+    backgroundColor: '#f1f5f9',
+    color: '#475569',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    fontSize: '1.125rem',
+    cursor: 'pointer',
+    flexShrink: 0,
   },
   logo: {
     flexShrink: 0,

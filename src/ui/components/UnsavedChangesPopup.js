@@ -10,14 +10,36 @@ const UnsavedChangesPopup = ({
   onSave,
 }) => (
   <div style={styles.popupOverlay} onClick={onCancel}>
-    <div style={styles.popup} onClick={(e) => e.stopPropagation()}>
-      <div style={styles.popupHeader}>
+    <style>
+      {`
+        @media (max-width: 768px) {
+          .unsaved-changes-popup .popup-footer-right {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .unsaved-changes-popup .popup-footer-right button {
+            width: 100% !important;
+          }
+          .unsaved-changes-popup .popup-header {
+            padding: 1rem 1rem 0 1rem !important;
+          }
+          .unsaved-changes-popup .popup-message {
+            padding: 0 1rem !important;
+          }
+          .unsaved-changes-popup .popup-footer {
+            padding: 1rem !important;
+          }
+        }
+      `}
+    </style>
+    <div style={styles.popup} className="unsaved-changes-popup" onClick={(e) => e.stopPropagation()}>
+      <div style={styles.popupHeader} className="popup-header">
         <h2 style={styles.popupTitle}>{title}</h2>
         <button type="button" style={styles.closeButton} onClick={onCancel}>×</button>
       </div>
-      <p style={styles.popupMessage}>{message}</p>
-      <div style={styles.popupFooter}>
-        <div style={styles.popupFooterRight}>
+      <p style={styles.popupMessage} className="popup-message">{message}</p>
+      <div style={styles.popupFooter} className="popup-footer">
+        <div style={styles.popupFooterRight} className="popup-footer-right">
           <button type="button" style={styles.cancelButton} onClick={onCancel}>
             CANCEL
           </button>

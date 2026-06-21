@@ -166,9 +166,9 @@ const NotesPage = () => {
 
   if (loading) {
     return (
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>Notes</h1>
+      <div style={styles.container} className="notes-page">
+        <div style={styles.header} className="page-header">
+          <h1 style={styles.title} className="page-title">Notes</h1>
         </div>
         <div style={styles.loadingContainer}>
           <div style={styles.spinner}></div>
@@ -179,10 +179,48 @@ const NotesPage = () => {
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Notes</h1>
-        <p style={styles.description}>
+    <div style={styles.container} className="notes-page">
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .notes-page {
+              padding: 1rem !important;
+            }
+            .notes-page .page-title {
+              font-size: 1.75rem !important;
+            }
+            .notes-page .page-description {
+              font-size: 1rem !important;
+            }
+            .notes-page .page-header {
+              margin-bottom: 1.25rem !important;
+              padding: 0.5rem 0 !important;
+            }
+            .notes-page .last-saved {
+              text-align: left !important;
+            }
+            .notes-page .page-content {
+              padding: 1rem !important;
+            }
+            .notes-page .day-section {
+              margin-bottom: 1.25rem !important;
+            }
+            .notes-page textarea {
+              font-size: 16px !important;
+              min-height: 120px;
+            }
+            .notes-page .page-actions {
+              justify-content: stretch !important;
+            }
+            .notes-page .save-button {
+              width: 100% !important;
+            }
+          }
+        `}
+      </style>
+      <div style={styles.header} className="page-header">
+        <h1 style={styles.title} className="page-title">Notes</h1>
+        <p style={styles.description} className="page-description">
           Write and edit notes for each day. Save works offline and uploads when you reconnect.
         </p>
       </div>
@@ -214,7 +252,7 @@ const NotesPage = () => {
       )}
 
       {lastSaved && (
-        <p style={styles.lastSaved}>
+        <p style={styles.lastSaved} className="last-saved">
           Last saved: {lastSaved.toLocaleString('en-US', {
             month: 'short',
             day: 'numeric',
@@ -232,9 +270,9 @@ const NotesPage = () => {
         </p>
       )}
 
-      <div style={styles.content}>
+      <div style={styles.content} className="page-content">
         {[0, 1, 2, 3, 4, 5].map((dayNum) => (
-          <div key={dayNum} style={styles.daySection}>
+          <div key={dayNum} style={styles.daySection} className="day-section">
             <label style={styles.dayLabel}>Day {dayNum}</label>
             <textarea
               value={notes[`day${dayNum}`]}
@@ -246,13 +284,14 @@ const NotesPage = () => {
           </div>
         ))}
 
-        <div style={styles.actions}>
+        <div style={styles.actions} className="page-actions">
           <button
             onClick={handleSave}
             style={{
               ...styles.saveButton,
               ...(hasUnsavedChanges ? {} : styles.saveButtonIdle),
             }}
+            className="save-button"
             disabled={saving || !hasUnsavedChanges}
           >
             {saving ? 'Saving...' : hasUnsavedChanges ? 'Save All Notes' : 'All Notes Saved'}

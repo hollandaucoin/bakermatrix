@@ -47,7 +47,22 @@ const OfflineStatusBar = () => {
   }
 
   return (
-    <div style={tone}>
+    <div style={tone} className="offline-status-bar">
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .offline-status-bar {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              padding: 0.625rem 1rem !important;
+              gap: 0.5rem !important;
+            }
+            .offline-status-bar .sync-button {
+              width: 100%;
+            }
+          }
+        `}
+      </style>
       <div style={styles.offlineBarContent}>
         <span style={styles.offlineBarMessage}>{message}</span>
         {lastSyncAt && isOnline && pendingCount === 0 && !lastSyncError && (
@@ -55,7 +70,7 @@ const OfflineStatusBar = () => {
         )}
       </div>
       {isOnline && pendingCount > 0 && !isSyncing && (
-        <button type="button" style={styles.syncButton} onClick={syncNow}>
+        <button type="button" style={styles.syncButton} className="sync-button" onClick={syncNow}>
           Sync now
         </button>
       )}

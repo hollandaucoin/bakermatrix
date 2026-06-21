@@ -14,6 +14,7 @@ import WorkshopAdminPage from './pages/WorkshopAdminPage.js';
 import NotesPage from './pages/NotesPage.js';
 import RollCallPage from './pages/RollCallPage.js';
 import OnlineOnly from './components/OnlineOnly.js';
+import DesktopOnly from './components/DesktopOnly.js';
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -144,7 +145,9 @@ const App = () => {
             <MainLayout onLogout={handleLogout} isAuthenticated={true} isAdmin={isAdmin}>
               {isAdmin ? (
                 <OnlineOnly pageName="Matrix Builder" isAdmin>
-                  <MatrixBuilder />
+                  <DesktopOnly pageName="Matrix Builder">
+                    <MatrixBuilder />
+                  </DesktopOnly>
                 </OnlineOnly>
               ) : (
                 <MatrixPage />
@@ -157,7 +160,9 @@ const App = () => {
             <MainLayout onLogout={handleLogout} isAuthenticated={true} isAdmin={isAdmin}>
               {isAdmin ? (
                 <OnlineOnly pageName="Matrix Builder" isAdmin>
-                  <MatrixBuilder />
+                  <DesktopOnly pageName="Matrix Builder">
+                    <MatrixBuilder />
+                  </DesktopOnly>
                 </OnlineOnly>
               ) : (
                 <MatrixPage />
@@ -169,7 +174,9 @@ const App = () => {
           <ProtectedRoute>
             <MainLayout onLogout={handleLogout} isAuthenticated={true} isAdmin={isAdmin}>
               {isAdmin ? (
-                <SavedMatrices />
+                <DesktopOnly pageName="Saved Matrices">
+                  <SavedMatrices />
+                </DesktopOnly>
               ) : (
                 <Navigate to="/matrix" replace />
               )}

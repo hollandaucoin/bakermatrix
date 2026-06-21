@@ -278,7 +278,7 @@ const WorkshopsPage = () => {
   };
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="workshops-page">
       <style>
         {`
           button:hover:not(:disabled) {
@@ -313,11 +313,110 @@ const WorkshopsPage = () => {
             color: white !important;
             border-color: #ef4444 !important;
           }
+          .workshops-page .table-row-toolbar {
+            display: none;
+          }
+          @media (max-width: 768px) {
+            .workshops-page {
+              padding: 1rem !important;
+              max-width: 100% !important;
+              box-sizing: border-box !important;
+            }
+            .workshops-page .page-content {
+              max-width: 100% !important;
+              overflow: hidden !important;
+            }
+            .workshops-page .page-title {
+              font-size: 1.75rem !important;
+            }
+            .workshops-page .page-description {
+              font-size: 1rem !important;
+            }
+            .workshops-page .page-header {
+              margin-bottom: 1.25rem !important;
+              padding: 0.5rem 0 !important;
+            }
+            .workshops-page .last-submitted {
+              text-align: left !important;
+            }
+            .workshops-page .table-header {
+              display: none !important;
+            }
+            .workshops-page .table-row {
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 0.75rem !important;
+              padding: 1rem !important;
+              align-items: stretch !important;
+              max-width: 100% !important;
+              box-sizing: border-box !important;
+            }
+            .workshops-page .table-row-toolbar {
+              display: flex !important;
+              align-items: center !important;
+              justify-content: space-between !important;
+              width: 100% !important;
+              margin-bottom: 0.25rem !important;
+              padding-bottom: 0.75rem !important;
+              border-bottom: 1px solid #e2e8f0 !important;
+              box-sizing: border-box !important;
+            }
+            .workshops-page .table-row-label {
+              font-size: 0.8125rem;
+              font-weight: 600;
+              color: #64748b;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+            .workshops-page .table-cell-actions-desktop {
+              display: none !important;
+            }
+            .workshops-page .table-cell {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              width: 100% !important;
+              min-width: 0 !important;
+              max-width: 100% !important;
+              box-sizing: border-box !important;
+            }
+            .workshops-page .table-cell::before {
+              content: attr(data-label);
+              font-size: 0.75rem;
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #475569;
+              margin-bottom: 0.375rem;
+            }
+            .workshops-page .table-actions {
+              flex-direction: column !important;
+              align-items: stretch !important;
+              gap: 0.75rem !important;
+              padding: 1rem !important;
+            }
+            .workshops-page .action-buttons {
+              flex-direction: column !important;
+              margin-left: 0 !important;
+              width: 100% !important;
+            }
+            .workshops-page .action-buttons button,
+            .workshops-page .add-row-button {
+              width: 100% !important;
+            }
+            .workshops-page input,
+            .workshops-page select {
+              font-size: 16px !important;
+              width: 100% !important;
+              max-width: 100% !important;
+              min-width: 0 !important;
+              box-sizing: border-box !important;
+            }
+          }
         `}
       </style>
-      <div style={styles.header}>
-        <h1 style={styles.title}>Workshops</h1>
-        <p style={styles.description}>
+      <div style={styles.header} className="page-header">
+        <h1 style={styles.title} className="page-title">Workshops</h1>
+        <p style={styles.description} className="page-description">
           {existingSubmission 
             ? 'Edit your workshop assignments below. You can modify, add, or remove entries, or delete your entire submission.'
             : 'Add workshop assignments by entering a name and two workshops for each delegate.'}
@@ -336,7 +435,7 @@ const WorkshopsPage = () => {
       )}
 
       {existingSubmission && (existingSubmission.updatedAt || existingSubmission.pendingSync) && (
-        <p style={styles.lastSubmitted}>
+        <p style={styles.lastSubmitted} className="last-submitted">
           {existingSubmission.pendingSync ? (
             <span style={styles.pendingSyncIndicator}>Saved locally · waiting to upload</span>
           ) : (
@@ -360,18 +459,31 @@ const WorkshopsPage = () => {
         </p>
       )}
 
-      <div style={styles.content}>
-        <div style={styles.tableSection}>
-          <div style={styles.tableHeader}>
+      <div style={styles.content} className="page-content">
+        <div style={styles.tableSection} className="table-section">
+          <div style={styles.tableHeader} className="table-header">
             <div style={styles.tableHeaderCell}>Name <span style={styles.required}>*</span></div>
             <div style={styles.tableHeaderCell}>Workshop 1 <span style={styles.required}>*</span></div>
             <div style={styles.tableHeaderCell}>Workshop 2 <span style={styles.required}>*</span></div>
             <div style={styles.tableHeaderCell}></div>
           </div>
 
-          {rows.map((row) => (
+          {rows.map((row, rowIndex) => (
             <div key={row.id} style={styles.tableRow} className="table-row">
-              <div style={styles.tableCell}>
+              {rows.length > 1 && (
+                <div className="table-row-toolbar">
+                  <span className="table-row-label">Entry {rowIndex + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveRow(row.id)}
+                    style={styles.removeRowButton}
+                    className="remove-row-button"
+                  >
+                    X
+                  </button>
+                </div>
+              )}
+              <div style={styles.tableCell} className="table-cell" data-label="Name">
                 <input
                   type="text"
                   value={row.name}
@@ -380,7 +492,7 @@ const WorkshopsPage = () => {
                   style={styles.input}
                 />
               </div>
-              <div style={styles.tableCell}>
+              <div style={styles.tableCell} className="table-cell" data-label="Workshop 1">
                 <select
                   value={row.workshop1}
                   onChange={(e) => handleUpdateRow(row.id, 'workshop1', e.target.value)}
@@ -397,7 +509,7 @@ const WorkshopsPage = () => {
                     ))}
                 </select>
               </div>
-              <div style={styles.tableCell}>
+              <div style={styles.tableCell} className="table-cell" data-label="Workshop 2">
                 <select
                   value={row.workshop2}
                   onChange={(e) => handleUpdateRow(row.id, 'workshop2', e.target.value)}
@@ -414,28 +526,31 @@ const WorkshopsPage = () => {
                     ))}
                 </select>
               </div>
-              <div style={styles.tableCell}>
+              <div style={styles.tableCell} className="table-cell table-cell-actions table-cell-actions-desktop">
                 {rows.length > 1 && (
                   <button
+                    type="button"
                     onClick={() => handleRemoveRow(row.id)}
                     style={styles.removeButton}
+                    aria-label="Remove row"
                   >
-                    X
+                    ×
                   </button>
                 )}
               </div>
             </div>
           ))}
 
-          <div style={styles.tableActions}>
+          <div style={styles.tableActions} className="table-actions">
             <button
               onClick={handleAddRow}
               style={styles.addRowButton}
+              className="add-row-button"
               disabled={loading}
             >
               + Add Row
             </button>
-            <div style={styles.actionButtons}>
+            <div style={styles.actionButtons} className="action-buttons">
               {existingSubmission && (
                 <button
                   onClick={handleDelete}
@@ -575,9 +690,13 @@ const styles = {
   tableCell: {
     display: 'flex',
     alignItems: 'center',
+    minWidth: 0,
   },
   input: {
     width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
     padding: '0.75rem 1rem',
     fontSize: '0.875rem',
     border: '1px solid #e2e8f0',
@@ -588,6 +707,9 @@ const styles = {
   },
   select: {
     width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
     padding: '0.75rem 1rem',
     fontSize: '0.875rem',
     border: '1px solid #e2e8f0',
@@ -605,7 +727,8 @@ const styles = {
   },
   removeButton: {
     padding: '0.5rem 0.75rem',
-    fontSize: '0.875rem',
+    fontSize: '1.125rem',
+    lineHeight: 1,
     fontWeight: '600',
     backgroundColor: 'transparent',
     color: '#ef4444',
@@ -617,6 +740,18 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  removeRowButton: {
+    padding: '0.5rem 0.75rem',
+    fontSize: '0.8125rem',
+    fontWeight: '600',
+    backgroundColor: '#fef2f2',
+    color: '#dc2626',
+    border: '1px solid #fecaca',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease-in-out',
+    flexShrink: 0,
   },
   tableActions: {
     display: 'flex',
