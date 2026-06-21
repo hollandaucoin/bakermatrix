@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const LandingPage = () => {
+const LandingPage = ({ isAuthenticated = false }) => {
   return (
     <div style={styles.container}>
       <div style={styles.content}>
@@ -10,9 +10,11 @@ const LandingPage = () => {
         <p style={styles.description}>
           <b>It's time</b> (last year) - streamline camp organization with the powerful <br/>matrix generator and committee/workshop management system 🥳
         </p>
-        <Link to="/login" style={styles.button}>
-          Login
-        </Link>
+        {!isAuthenticated && (
+          <Link to="/login" style={styles.button}>
+            Login
+          </Link>
+        )}
       </div>
     </div>
   );

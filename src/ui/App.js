@@ -84,7 +84,7 @@ const App = () => {
         {/* Public routes (no authentication required) */}
         <Route path="/" element={
           <MainLayout onLogout={handleLogout} isAuthenticated={isAuthenticated}>
-            <LandingPage />
+            <LandingPage isAuthenticated={isAuthenticated} />
           </MainLayout>
         } />
         <Route path="/login" element={
