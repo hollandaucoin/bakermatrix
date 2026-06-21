@@ -15,11 +15,15 @@ import NotesPage from './pages/NotesPage.js';
 import RollCallPage from './pages/RollCallPage.js';
 import OnlineOnly from './components/OnlineOnly.js';
 import DesktopOnly from './components/DesktopOnly.js';
+import SeniorCounselorOnly from './components/SeniorCounselorOnly.js';
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userType, setUserType] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const isSeniorCounselor = userType === 'seniorCounselor';
 
   useEffect(() => {
     // Check authentication status on app load
@@ -33,9 +37,11 @@ const App = () => {
       if (data.success && data.authenticated) {
         setIsAuthenticated(true);
         setIsAdmin(Boolean(data.admin || data.user?.admin));
+        setUserType(data.user?.userType || null);
       } else {
         setIsAuthenticated(false);
         setIsAdmin(false);
+        setUserType(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -43,6 +49,7 @@ const App = () => {
       if (cached?.authenticated) {
         setIsAuthenticated(true);
         setIsAdmin(Boolean(cached.admin));
+        setUserType(cached.user?.userType || null);
       }
     } finally {
       setIsLoading(false);
@@ -52,11 +59,13 @@ const App = () => {
   const handleLogin = (userData) => {
     setIsAuthenticated(true);
     setIsAdmin(userData?.admin || false);
+    setUserType(userData?.userType || null);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setIsAdmin(false);
+    setUserType(null);
     // Call logout API (fire-and-forget)
     api.post('/api/auth/logout').catch(() => {});
   };
@@ -102,7 +111,9 @@ const App = () => {
                   <CommitteesAdminPage />
                 </OnlineOnly>
               ) : (
-                <CommitteesPage />
+                <SeniorCounselorOnly isSeniorCounselor={isSeniorCounselor} pageName="Committees">
+                  <CommitteesPage />
+                </SeniorCounselorOnly>
               )}
             </MainLayout>
           </ProtectedRoute>
@@ -115,7 +126,9 @@ const App = () => {
                   <WorkshopAdminPage />
                 </OnlineOnly>
               ) : (
-                <WorkshopsPage />
+                <SeniorCounselorOnly isSeniorCounselor={isSeniorCounselor} pageName="Workshops">
+                  <WorkshopsPage />
+                </SeniorCounselorOnly>
               )}
             </MainLayout>
           </ProtectedRoute>
@@ -124,9 +137,11 @@ const App = () => {
           <ProtectedRoute>
             <MainLayout onLogout={handleLogout} isAuthenticated={true} isAdmin={isAdmin}>
               {!isAdmin ? (
-                <OnlineOnly pageName="Roll Call">
-                  <RollCallPage />
-                </OnlineOnly>
+                <SeniorCounselorOnly isSeniorCounselor={isSeniorCounselor} pageName="Roll Call">
+                  <OnlineOnly pageName="Roll Call">
+                    <RollCallPage />
+                  </OnlineOnly>
+                </SeniorCounselorOnly>
               ) : (
                 <Navigate to="/matrix" replace />
               )}
