@@ -17,6 +17,26 @@ import {
   RESOURCE_TYPES,
 } from './offlineSync.js';
 
+let authExpiredHandler = null;
+
+export const setAuthExpiredHandler = (handler) => {
+  authExpiredHandler = handler;
+};
+
+export const onSessionExpired = async () => {
+  await clearSession();
+  authExpiredHandler?.();
+};
+
+const isLoginRequest = (url) => url.split('?')[0] === '/api/auth/login';
+
+const handleUnauthorized = async (url) => {
+  if (isLoginRequest(url)) {
+    return;
+  }
+  await onSessionExpired();
+};
+
 const OFFLINE_WRITE_ROUTES = [
   { match: /^\/api\/committee-submissions\/?$/, method: 'POST', resourceType: RESOURCE_TYPES.COMMITTEE_SUBMISSION },
   { match: /^\/api\/committee-submissions\/[^/]+$/, method: 'PUT', resourceType: RESOURCE_TYPES.COMMITTEE_SUBMISSION },
@@ -67,6 +87,9 @@ async function requestDirect(method, url, body) {
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      await handleUnauthorized(url);
+    }
     const message = (data && data.error) || `Request failed with status ${response.status}`;
     const error = new Error(message);
     error.response = { status: response.status, data };
@@ -151,18 +174,25 @@ async function requestInner(method, url, body) {
 
     try {
       const response = await requestDirect(method, url, body);
-      if (url === '/api/auth/status' && response.data?.authenticated) {
-        await saveSession({
-          authenticated: true,
-          admin: Boolean(response.data.admin),
-          user: response.data.user,
-        });
+      if (url === '/api/auth/status') {
+        if (response.data?.authenticated) {
+          await saveSession({
+            authenticated: true,
+            admin: Boolean(response.data.admin),
+            user: response.data.user,
+          });
+        } else {
+          await clearSession();
+        }
       }
       await writeCachedGet(url, response.data, response.status);
       return { ...response, meta: buildMeta() };
     } catch (error) {
       if (error.response?.status === 404) {
         await writeCachedGet(url, error.response.data, 404);
+      }
+      if (error.response?.status === 401) {
+        throw error;
       }
       const cached = await readCachedGet(url).catch(() => null);
       if (cached) return cached;
@@ -177,12 +207,16 @@ async function requestInner(method, url, body) {
   try {
     const response = await requestDirect(method, url, body);
 
-    if (url === '/api/auth/status' && response.data?.authenticated) {
-      await saveSession({
-        authenticated: true,
-        admin: Boolean(response.data.admin),
-        user: response.data.user,
-      });
+    if (url === '/api/auth/status') {
+      if (response.data?.authenticated) {
+        await saveSession({
+          authenticated: true,
+          admin: Boolean(response.data.admin),
+          user: response.data.user,
+        });
+      } else {
+        await clearSession();
+      }
     }
 
     if (method === 'GET' && cacheKey) {
@@ -209,6 +243,9 @@ async function requestInner(method, url, body) {
 
     return { ...response, meta: buildMeta() };
   } catch (error) {
+    if (error.response?.status === 401) {
+      throw error;
+    }
     if (method === 'GET' && cacheKey) {
       const cached = await readCachedGet(url).catch(() => null);
       if (cached) return cached;

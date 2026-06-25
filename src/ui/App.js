@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import api, { restoreCachedAuth } from './util/api.js';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import api, { restoreCachedAuth, setAuthExpiredHandler } from './util/api.js';
 import MainLayout from './components/MainLayout.js';
 import LandingPage from './pages/LandingPage.js';
 import Login from './pages/LoginPage.js';
@@ -18,12 +18,27 @@ import DesktopOnly from './components/DesktopOnly.js';
 import SeniorCounselorOnly from './components/SeniorCounselorOnly.js';
 
 const App = () => {
+  const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userType, setUserType] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const isSeniorCounselor = userType === 'seniorCounselor';
+
+  const clearAuthState = useCallback(() => {
+    setIsAuthenticated(false);
+    setIsAdmin(false);
+    setUserType(null);
+  }, []);
+
+  useEffect(() => {
+    setAuthExpiredHandler(() => {
+      clearAuthState();
+      navigate('/login', { replace: true });
+    });
+    return () => setAuthExpiredHandler(null);
+  }, [clearAuthState, navigate]);
 
   useEffect(() => {
     // Check authentication status on app load
@@ -39,17 +54,21 @@ const App = () => {
         setIsAdmin(Boolean(data.admin || data.user?.admin));
         setUserType(data.user?.userType || null);
       } else {
-        setIsAuthenticated(false);
-        setIsAdmin(false);
-        setUserType(null);
+        clearAuthState();
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      const cached = await restoreCachedAuth();
-      if (cached?.authenticated) {
-        setIsAuthenticated(true);
-        setIsAdmin(Boolean(cached.admin));
-        setUserType(cached.user?.userType || null);
+      if (!navigator.onLine) {
+        const cached = await restoreCachedAuth();
+        if (cached?.authenticated) {
+          setIsAuthenticated(true);
+          setIsAdmin(Boolean(cached.admin));
+          setUserType(cached.user?.userType || null);
+        } else {
+          clearAuthState();
+        }
+      } else {
+        clearAuthState();
       }
     } finally {
       setIsLoading(false);
@@ -63,9 +82,7 @@ const App = () => {
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    setIsAdmin(false);
-    setUserType(null);
+    clearAuthState();
     // Call logout API (fire-and-forget)
     api.post('/api/auth/logout').catch(() => {});
   };

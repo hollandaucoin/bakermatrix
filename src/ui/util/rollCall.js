@@ -1,4 +1,5 @@
 import { parseNamesFromCsv } from './parseRollCallCsv.js';
+import { onSessionExpired } from './api.js';
 
 export const parseParenthesisLines = (text) => {
   const matches = [...String(text || '').matchAll(/\(([^)]+)\)/g)];
@@ -89,6 +90,9 @@ const postBlob = async (url, body) => {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      await onSessionExpired();
+    }
     let message = 'Request failed';
     try {
       const errorBody = await readJsonResponse(response);
@@ -120,6 +124,9 @@ const requestJson = async (url, { method = 'GET', body } = {}) => {
   });
   const data = await readJsonResponse(response);
   if (!response.ok) {
+    if (response.status === 401) {
+      await onSessionExpired();
+    }
     throw new Error(data?.error || 'Request failed');
   }
   return data;
