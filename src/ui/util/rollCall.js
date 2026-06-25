@@ -60,6 +60,11 @@ const readJsonResponse = async (response) => {
         'Server returned HTML instead of JSON. Restart the backend with `npm run dev` so the roll-call API routes load.'
       );
     }
+    if (/^\s*import\s/m.test(text)) {
+      throw new Error(
+        'Server returned JavaScript instead of a file. The roll-call API may not be running on this host.'
+      );
+    }
     throw new Error(text.slice(0, 200) || 'Invalid server response');
   }
 };
@@ -92,6 +97,15 @@ const postBlob = async (url, body) => {
       message = err.message || message;
     }
     throw new Error(message);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const errorBody = await readJsonResponse(response);
+    throw new Error(errorBody?.error || 'Server returned an error instead of a PowerPoint file');
+  }
+  if (contentType.includes('text/html') || contentType.includes('javascript')) {
+    throw new Error('Server returned an unexpected response. The roll-call API may not be deployed correctly.');
   }
 
   return response.blob();

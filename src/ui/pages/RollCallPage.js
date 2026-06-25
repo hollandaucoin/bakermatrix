@@ -19,6 +19,8 @@ import {
   updateRollCallStory,
 } from '../util/rollCall.js';
 
+const GENERATE_SCRIPT_ENABLED = process.env.GENERATE_SCRIPT_ENABLED === 'true';
+
 const formatSavedAt = (value) => {
   if (!value) return '';
   return new Date(value).toLocaleString('en-US', {
@@ -437,6 +439,9 @@ const RollCallPage = () => {
 
   const handleGenerateStoryRequest = () => {
     setError('');
+    if (!GENERATE_SCRIPT_ENABLED) {
+      return;
+    }
     if (!selectedFileId) {
       setError('Upload or select a name list first.');
       return;
@@ -637,15 +642,18 @@ const RollCallPage = () => {
           </p>
           <button
             onClick={handleGenerateStoryRequest}
-            disabled={isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory}
+            disabled={!GENERATE_SCRIPT_ENABLED || isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory}
             style={{
               ...styles.button,
-              ...(isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory ? styles.buttonDisabled : {}),
+              ...(!GENERATE_SCRIPT_ENABLED || isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory ? styles.buttonDisabled : {}),
             }}
           >
             {isGeneratingStory ? 'Generating Script...' : '✨ Generate Script'}
           </button>
-          {!capabilities.claudeStory && (
+          {!GENERATE_SCRIPT_ENABLED && (
+            <p style={styles.warning}>Script generation is temporarily disabled.</p>
+          )}
+          {GENERATE_SCRIPT_ENABLED && !capabilities.claudeStory && (
             <p style={styles.warning}>Set <code style={styles.code}>ANTHROPIC_API_KEY</code> on the server to enable story generation.</p>
           )}
         </section>
