@@ -4,7 +4,7 @@ import ToastContainer from '../ToastContainer.js';
 import UnsavedChangesPopup from '../UnsavedChangesPopup.js';
 import { useNavigationGuard } from '../../context/NavigationGuardContext.js';
 import { useOffline } from '../../context/OfflineContext.js';
-import { councilHasPostingSeparationViolation, swapCouncilPairings, swapCouncilRooms } from '../../util/matrixCouncil.js';
+import { councilHasPostingSeparationViolation, parseSeniorCounselorName, swapCouncilPairings, swapCouncilRooms, updateCouncilPostingDorm } from '../../util/matrixCouncil.js';
 import { computeMatrixBalance } from '../../util/matrixBalance.js';
 
 const SavedMatrices = () => {
@@ -564,6 +564,10 @@ const MatrixDetailView = ({ matrix, onBack, onUpdateMatrix, onSaveMatrix, readOn
   const [activeDrag, setActiveDrag] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
   const [pendingLocalBack, setPendingLocalBack] = useState(false);
+  const [maleDormOptions, setMaleDormOptions] = useState([]);
+  const [femaleDormOptions, setFemaleDormOptions] = useState([]);
+  const [postingDormIssues, setPostingDormIssues] = useState([]);
+  const [seniorCounselorsById, setSeniorCounselorsById] = useState(() => new Map());
 
   const {
     registerGuard,
@@ -608,7 +612,31 @@ const MatrixDetailView = ({ matrix, onBack, onUpdateMatrix, onSaveMatrix, readOn
 
   const validateCouncils = async (councils) => {
     const { data } = await api.post('/api/matrices/validate-councils', { councils });
+    setPostingDormIssues(data.postingDormIssues || []);
     return data.councils;
+  };
+
+  const getSeniorCounselorForCouncil = (council) => {
+    if (council.seniorCounselorId && seniorCounselorsById.has(council.seniorCounselorId)) {
+      return seniorCounselorsById.get(council.seniorCounselorId);
+    }
+    const targetName = parseSeniorCounselorName(council.seniorCounselor).toLowerCase();
+    return [...seniorCounselorsById.values()].find(
+      (sc) => sc.name.trim().toLowerCase() === targetName
+    );
+  };
+
+  const getPostingDormOptionsForCouncil = (council) => {
+    const sc = getSeniorCounselorForCouncil(council);
+    if (sc?.gender === 'male') return femaleDormOptions;
+    if (sc?.gender === 'female') return maleDormOptions;
+    return [...femaleDormOptions, ...maleDormOptions];
+  };
+
+  const getPostingDormSelectValue = (council) => {
+    const name = council.scPostingDorm?.name;
+    if (!name || name === 'No Dorm Assigned') return '';
+    return name;
   };
 
   const moveSchoolToCouncil = async (fromCouncilIdx, schoolIdx, toCouncilIdx) => {
@@ -752,7 +780,21 @@ const MatrixDetailView = ({ matrix, onBack, onUpdateMatrix, onSaveMatrix, readOn
   const handleStartEditSchools = async () => {
     try {
       setIsStartingEdit(true);
-      const validated = await validateCouncils(matrix.councils || []);
+      const [validated, dormsResponse, scResponse] = await Promise.all([
+        validateCouncils(matrix.councils || []),
+        api.get('/api/dorms'),
+        api.get('/api/seniorCounselors'),
+      ]);
+      const dorms = dormsResponse.data || [];
+      setMaleDormOptions(
+        dorms.filter((dorm) => dorm.type === 'male').map((dorm) => dorm.name).sort()
+      );
+      setFemaleDormOptions(
+        dorms.filter((dorm) => dorm.type === 'female').map((dorm) => dorm.name).sort()
+      );
+      setSeniorCounselorsById(
+        new Map((scResponse.data || []).map((sc) => [sc._id, sc]))
+      );
       setEditedCouncils(validated);
       setIsEditingSchools(true);
     } catch {
@@ -762,10 +804,25 @@ const MatrixDetailView = ({ matrix, onBack, onUpdateMatrix, onSaveMatrix, readOn
     }
   };
 
+  const handlePostingDormChange = async (councilIdx, dormName) => {
+    if (!dormName) return;
+    try {
+      const updated = updateCouncilPostingDorm(editedCouncils, councilIdx, dormName);
+      const validated = await validateCouncils(updated);
+      setEditedCouncils(validated);
+    } catch {
+      window.showToast?.('Could not update posting dorm.', 'error');
+    }
+  };
+
   const handleCancelEditSchools = () => {
     setMatrixName(matrix.name || '');
     setEditedCouncils(matrix.councils || []);
     setIsEditingSchools(false);
+    setMaleDormOptions([]);
+    setFemaleDormOptions([]);
+    setPostingDormIssues([]);
+    setSeniorCounselorsById(new Map());
     clearDragState();
   };
 
@@ -1030,7 +1087,7 @@ const MatrixDetailView = ({ matrix, onBack, onUpdateMatrix, onSaveMatrix, readOn
                 type="button"
                 style={styles.actionButton}
                 onClick={handleSaveCouncils}
-                disabled={!editDirty || isSavingCouncils || !matrixName.trim()}
+                disabled={!editDirty || isSavingCouncils || !matrixName.trim() || postingDormIssues.length > 0}
               >
                 {isSavingCouncils ? 'Saving...' : 'Save Changes'}
               </button>
@@ -1069,6 +1126,19 @@ const MatrixDetailView = ({ matrix, onBack, onUpdateMatrix, onSaveMatrix, readOn
       {displayCouncils?.some(councilHasPostingSeparationViolation) && (
         <div style={styles.legend}>
           SC posting dorms in <span style={styles.legendConflict}>red</span> house this council&apos;s own junior counselor.
+        </div>
+      )}
+      {postingDormIssues.length > 0 && (
+        <div style={{ ...styles.balanceBanner, ...styles.balanceBannerWarning }}>
+          <strong>Posting dorm coverage</strong>
+          <ul style={styles.balanceList}>
+            {postingDormIssues.map((issue, i) => <li key={i}>{issue}</li>)}
+          </ul>
+        </div>
+      )}
+      {isEditingSchools && (
+        <div style={styles.editHint}>
+          Drag schools between councils, rooms between rows, or SC/JC pairings between rows. Use the posting dorm dropdown to change where each SC posts. Every dorm needs at least one posting SC; male dorms allow up to two.
         </div>
       )}
 
@@ -1243,11 +1313,38 @@ const MatrixDetailView = ({ matrix, onBack, onUpdateMatrix, onSaveMatrix, readOn
                         ))}
                       </div>
                     </td>
-                    <td
-                      style={isEditingSchools ? pairingBundleCellStyle(index, 'posting') : styles.tableCell}
-                      {...(isEditingSchools ? pairingDropHandlers(index) : {})}
-                    >
-                      {council.scPostingDorm ? (
+                    <td style={styles.tableCell}>
+                      {isEditingSchools ? (
+                        <div
+                          style={councilHasPostingSeparationViolation(council)
+                            ? styles.scPostingDormConflict
+                            : undefined}
+                        >
+                          <select
+                            value={getPostingDormSelectValue(council)}
+                            onChange={(e) => handlePostingDormChange(index, e.target.value)}
+                            style={styles.postingDormSelect}
+                            title="Change SC posting dorm"
+                            required
+                          >
+                            {!getPostingDormSelectValue(council) && (
+                              <option value="" disabled>Select posting dorm</option>
+                            )}
+                            {getPostingDormOptionsForCouncil(council).map((dormName) => (
+                              <option key={dormName} value={dormName}>{dormName}</option>
+                            ))}
+                            {getPostingDormSelectValue(council)
+                              && !getPostingDormOptionsForCouncil(council).includes(getPostingDormSelectValue(council)) && (
+                              <option value={getPostingDormSelectValue(council)}>
+                                {getPostingDormSelectValue(council)}
+                              </option>
+                            )}
+                          </select>
+                          {council.scPostingDorm?.jcs && (
+                            <div style={styles.scDormJcs}>{council.scPostingDorm.jcs}</div>
+                          )}
+                        </div>
+                      ) : council.scPostingDorm ? (
                         <div
                           style={councilHasPostingSeparationViolation(council) ? styles.scPostingDormConflict : undefined}
                           title={councilHasPostingSeparationViolation(council)
@@ -1903,6 +2000,18 @@ const styles = {
   scDormJcs: {
     fontSize: '0.75rem',
     color: '#6b7280',
+  },
+  postingDormSelect: {
+    width: '100%',
+    maxWidth: '120px',
+    padding: '0.35rem 0.25rem',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    backgroundColor: '#fff',
+    color: '#1e293b',
+    cursor: 'pointer',
   },
   scPartner: {
     fontSize: '0.75rem',
