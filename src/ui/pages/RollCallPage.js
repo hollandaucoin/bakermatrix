@@ -646,7 +646,7 @@ const RollCallPage = () => {
               ...(!capabilities.generateScript || isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory ? styles.buttonDisabled : {}),
             }}
           >
-            {isGeneratingStory ? 'Generating Script...' : '✨ Generate Script'}
+            {isGeneratingStory ? 'Generating Script (15–30+ min for large lists)...' : '✨ Generate Script'}
           </button>
           {!capabilities.generateScript && (
             <p style={styles.warning}>Script generation is temporarily disabled.</p>

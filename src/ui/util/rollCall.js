@@ -176,10 +176,13 @@ export const generateRollCallStory = async (fileId, { names, csv } = {}) => {
   }
 
   const jobId = started.jobId;
-  const deadline = Date.now() + 12 * 60 * 1000; // 12 minutes
+  // Full camp rosters (~250 names) with Opus + skill audits routinely take
+  // 15–30+ minutes. Keep polling long enough that the browser doesn't give up
+  // while the server is still working.
+  const deadline = Date.now() + 45 * 60 * 1000; // 45 minutes
 
   while (Date.now() < deadline) {
-    await sleep(3000);
+    await sleep(5000);
     const status = await requestJson(`/api/roll-call/stories/generate/${jobId}`);
     if (status.status === 'done') {
       return status;
@@ -189,7 +192,9 @@ export const generateRollCallStory = async (fileId, { names, csv } = {}) => {
     }
   }
 
-  throw new Error('Script generation timed out after 12 minutes. Try again.');
+  throw new Error(
+    'Still generating after 45 minutes. Refresh the page and check your saved stories — it may have finished in the background.'
+  );
 };
 
 export const updateRollCallStory = async (storyId, { story, breakName }) => {
