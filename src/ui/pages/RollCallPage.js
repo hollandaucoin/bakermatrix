@@ -19,8 +19,6 @@ import {
   updateRollCallStory,
 } from '../util/rollCall.js';
 
-const GENERATE_SCRIPT_ENABLED = process.env.GENERATE_SCRIPT_ENABLED === 'true';
-
 const formatSavedAt = (value) => {
   if (!value) return '';
   return new Date(value).toLocaleString('en-US', {
@@ -174,7 +172,7 @@ const RollCallPage = () => {
   const fileInputRef = useRef(null);
   const [storyText, setStoryText] = useState('');
   const [breakName, setBreakName] = useState('');
-  const [capabilities, setCapabilities] = useState({ claudeStory: false });
+  const [capabilities, setCapabilities] = useState({ claudeStory: false, generateScript: false });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isParsingCsv, setIsParsingCsv] = useState(false);
@@ -439,7 +437,7 @@ const RollCallPage = () => {
 
   const handleGenerateStoryRequest = () => {
     setError('');
-    if (!GENERATE_SCRIPT_ENABLED) {
+    if (!capabilities.generateScript) {
       return;
     }
     if (!selectedFileId) {
@@ -642,18 +640,18 @@ const RollCallPage = () => {
           </p>
           <button
             onClick={handleGenerateStoryRequest}
-            disabled={!GENERATE_SCRIPT_ENABLED || isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory}
+            disabled={!capabilities.generateScript || isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory}
             style={{
               ...styles.button,
-              ...(!GENERATE_SCRIPT_ENABLED || isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory ? styles.buttonDisabled : {}),
+              ...(!capabilities.generateScript || isGeneratingStory || !selectedFileId || csvNames.length === 0 || !capabilities.claudeStory ? styles.buttonDisabled : {}),
             }}
           >
             {isGeneratingStory ? 'Generating Script...' : '✨ Generate Script'}
           </button>
-          {!GENERATE_SCRIPT_ENABLED && (
+          {!capabilities.generateScript && (
             <p style={styles.warning}>Script generation is temporarily disabled.</p>
           )}
-          {GENERATE_SCRIPT_ENABLED && !capabilities.claudeStory && (
+          {capabilities.generateScript && !capabilities.claudeStory && (
             <p style={styles.warning}>Set <code style={styles.code}>ANTHROPIC_API_KEY</code> on the server to enable story generation.</p>
           )}
         </section>
