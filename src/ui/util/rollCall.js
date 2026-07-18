@@ -81,6 +81,8 @@ const downloadBlob = (blob, fileName) => {
   window.URL.revokeObjectURL(url);
 };
 
+const isJsonBody = (data) => data !== null && typeof data === 'object';
+
 const postBlob = async (url, body) => {
   const response = await fetch(url, {
     method: 'POST',
@@ -90,15 +92,17 @@ const postBlob = async (url, body) => {
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      await onSessionExpired();
-    }
     let message = 'Request failed';
+    let errorBody = null;
     try {
-      const errorBody = await readJsonResponse(response);
+      errorBody = await readJsonResponse(response);
       message = errorBody?.error || message;
     } catch (err) {
       message = err.message || message;
+    }
+    // Only a real JSON 401 from our server clears the saved login.
+    if (response.status === 401 && isJsonBody(errorBody)) {
+      await onSessionExpired();
     }
     throw new Error(message);
   }
@@ -124,7 +128,7 @@ const requestJson = async (url, { method = 'GET', body } = {}) => {
   });
   const data = await readJsonResponse(response);
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && isJsonBody(data)) {
       await onSessionExpired();
     }
     throw new Error(data?.error || 'Request failed');

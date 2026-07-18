@@ -37,6 +37,30 @@ const handleUnauthorized = async (url) => {
   await onSessionExpired();
 };
 
+// Captive portals / flaky proxies can answer with HTML instead of JSON.
+// Never treat those responses as real API answers.
+const isJsonPayload = (data) => data !== null && typeof data === 'object';
+
+const isAuthStatusUrl = (url) => url.split('?')[0] === '/api/auth/status';
+
+// Returns true only for a trustworthy answer from our server.
+const applyAuthStatusResult = async (data) => {
+  if (!isJsonPayload(data) || data.success !== true) {
+    return false;
+  }
+  if (data.authenticated) {
+    await saveSession({
+      success: true,
+      authenticated: true,
+      admin: Boolean(data.admin),
+      user: data.user,
+    });
+  } else {
+    await clearSession();
+  }
+  return true;
+};
+
 const OFFLINE_WRITE_ROUTES = [
   { match: /^\/api\/committee-submissions\/?$/, method: 'POST', resourceType: RESOURCE_TYPES.COMMITTEE_SUBMISSION },
   { match: /^\/api\/committee-submissions\/[^/]+$/, method: 'PUT', resourceType: RESOURCE_TYPES.COMMITTEE_SUBMISSION },
@@ -87,7 +111,9 @@ async function requestDirect(method, url, body) {
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
+    // Only trust a 401 that carries our server's JSON body — a portal/proxy
+    // 401 with an HTML page must not wipe the saved login.
+    if (response.status === 401 && isJsonPayload(data)) {
       await handleUnauthorized(url);
     }
     const message = (data && data.error) || `Request failed with status ${response.status}`;
@@ -124,6 +150,9 @@ async function readCachedGet(url) {
 async function writeCachedGet(url, data, status) {
   const cacheKey = URL_CACHE_KEY[url.split('?')[0]];
   if (!cacheKey) return;
+
+  // Don't overwrite good cached data with portal HTML or other non-JSON noise.
+  if (data !== null && !isJsonPayload(data)) return;
 
   await setCacheEntry(cacheKey, {
     data,
@@ -174,15 +203,13 @@ async function requestInner(method, url, body) {
 
     try {
       const response = await requestDirect(method, url, body);
-      if (url === '/api/auth/status') {
-        if (response.data?.authenticated) {
-          await saveSession({
-            authenticated: true,
-            admin: Boolean(response.data.admin),
-            user: response.data.user,
-          });
-        } else {
-          await clearSession();
+      if (isAuthStatusUrl(url)) {
+        const trustworthy = await applyAuthStatusResult(response.data);
+        if (!trustworthy) {
+          // Garbage answer (captive portal, proxy). Use the saved login instead.
+          const cached = await readCachedGet(url).catch(() => null);
+          if (cached) return cached;
+          throw new Error('Could not verify login. Check your connection.');
         }
       }
       await writeCachedGet(url, response.data, response.status);
@@ -207,16 +234,8 @@ async function requestInner(method, url, body) {
   try {
     const response = await requestDirect(method, url, body);
 
-    if (url === '/api/auth/status') {
-      if (response.data?.authenticated) {
-        await saveSession({
-          authenticated: true,
-          admin: Boolean(response.data.admin),
-          user: response.data.user,
-        });
-      } else {
-        await clearSession();
-      }
+    if (isAuthStatusUrl(url)) {
+      await applyAuthStatusResult(response.data);
     }
 
     if (method === 'GET' && cacheKey) {
@@ -270,6 +289,7 @@ export const restoreCachedAuth = async () => {
 
 export const saveOfflineSessionFromLogin = async (user) => {
   await saveSession({
+    success: true,
     authenticated: true,
     admin: Boolean(user?.admin),
     user: {

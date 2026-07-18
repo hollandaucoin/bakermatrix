@@ -45,31 +45,36 @@ const App = () => {
     checkAuthStatus();
   }, []);
 
+  const applyCachedAuth = async () => {
+    const cached = await restoreCachedAuth();
+    if (cached?.authenticated) {
+      setIsAuthenticated(true);
+      setIsAdmin(Boolean(cached.admin || cached.user?.admin));
+      setUserType(cached.user?.userType || null);
+      return true;
+    }
+    clearAuthState();
+    return false;
+  };
+
   const checkAuthStatus = async () => {
     try {
       const { data } = await api.get('/api/auth/status');
 
-      if (data.success && data.authenticated) {
+      // Cached offline sessions (and login saves) may omit `success`.
+      // Only `authenticated` matters for staying logged in.
+      if (data?.authenticated) {
         setIsAuthenticated(true);
         setIsAdmin(Boolean(data.admin || data.user?.admin));
         setUserType(data.user?.userType || null);
       } else {
-        clearAuthState();
+        await applyCachedAuth();
       }
     } catch (error) {
+      // Couldn't reach the server (offline, dead Wi-Fi, captive portal...).
+      // That is NOT a logout — fall back to the saved login.
       console.error('Auth check failed:', error);
-      if (!navigator.onLine) {
-        const cached = await restoreCachedAuth();
-        if (cached?.authenticated) {
-          setIsAuthenticated(true);
-          setIsAdmin(Boolean(cached.admin));
-          setUserType(cached.user?.userType || null);
-        } else {
-          clearAuthState();
-        }
-      } else {
-        clearAuthState();
-      }
+      await applyCachedAuth();
     } finally {
       setIsLoading(false);
     }
