@@ -155,27 +155,26 @@ const CommitteesPage = () => {
 
   const submitAssignments = async () => {
     const validRows = rows.filter(row =>
-      row.name.trim() && row.committee
+      row.name.trim()
     );
 
     if (validRows.length === 0) {
-      setMessage({ type: 'error', text: 'Please fill in all required fields for at least one row' });
+      setMessage({ type: 'error', text: 'Please enter a name for at least one row' });
       return false;
     }
 
     const incompleteRows = rows.filter(row =>
-      (row.name.trim() || row.committee) &&
-      (!row.name.trim() || !row.committee)
+      row.committee && !row.name.trim()
     );
 
     if (incompleteRows.length > 0) {
-      setMessage({ type: 'error', text: 'Please fill in all fields for each row, or remove incomplete rows' });
+      setMessage({ type: 'error', text: 'Please enter a name for every row with a committee selected' });
       return false;
     }
 
     const assignments = validRows.map(row => ({
       name: row.name.trim(),
-      committee: row.committee,
+      ...(row.committee ? { committee: row.committee } : {}),
     }));
 
     const url = existingSubmission
@@ -408,8 +407,8 @@ const CommitteesPage = () => {
         <h1 style={styles.title} className="page-title">Committees</h1>
         <p style={styles.description} className="page-description">
           {existingSubmission
-            ? 'Edit your committee assignments below. You can modify, add, or remove entries, or delete your entire submission.'
-            : 'Add committee assignments by entering a name and selecting a committee for each delegate.'}
+            ? 'Edit delegate names and committee assignments below. Committees can be left blank and added later.'
+            : 'Enter delegate names now. Committee selections are optional and can be added later.'}
         </p>
       </div>
 
@@ -453,7 +452,7 @@ const CommitteesPage = () => {
         <div style={styles.tableSection} className="table-section">
           <div style={styles.tableHeader} className="table-header">
             <div style={styles.tableHeaderCell}>Name <span style={styles.required}>*</span></div>
-            <div style={styles.tableHeaderCell}>Committee <span style={styles.required}>*</span></div>
+            <div style={styles.tableHeaderCell}>Committee (optional)</div>
             <div style={styles.tableHeaderCell}></div>
           </div>
 

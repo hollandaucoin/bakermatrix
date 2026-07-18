@@ -30,9 +30,11 @@ const buildOptimisticSubmission = (existing, body, resourceType) => {
       _id: localId,
       assignments: (body.assignments || []).map((assignment) => ({
         name: assignment.name,
-        committee: typeof assignment.committee === 'object'
-          ? assignment.committee
-          : { _id: assignment.committee },
+        committee: assignment.committee
+          ? (typeof assignment.committee === 'object'
+            ? assignment.committee
+            : { _id: assignment.committee })
+          : null,
       })),
       updatedAt: now,
       pendingSync: true,
@@ -44,12 +46,16 @@ const buildOptimisticSubmission = (existing, body, resourceType) => {
     _id: localId,
     assignments: (body.assignments || []).map((assignment) => ({
       name: assignment.name,
-      workshop1: typeof assignment.workshop1 === 'object'
-        ? assignment.workshop1
-        : { _id: assignment.workshop1 },
-      workshop2: typeof assignment.workshop2 === 'object'
-        ? assignment.workshop2
-        : { _id: assignment.workshop2 },
+      workshop1: assignment.workshop1
+        ? (typeof assignment.workshop1 === 'object'
+          ? assignment.workshop1
+          : { _id: assignment.workshop1 })
+        : null,
+      workshop2: assignment.workshop2
+        ? (typeof assignment.workshop2 === 'object'
+          ? assignment.workshop2
+          : { _id: assignment.workshop2 })
+        : null,
     })),
     updatedAt: now,
     pendingSync: true,

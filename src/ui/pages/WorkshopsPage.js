@@ -170,28 +170,27 @@ const WorkshopsPage = () => {
 
   const submitAssignments = async () => {
     const validRows = rows.filter(row =>
-      row.name.trim() && row.workshop1 && row.workshop2 && row.workshop1 !== row.workshop2
+      row.name.trim()
     );
 
     if (validRows.length === 0) {
-      setMessage({ type: 'error', text: 'Please fill in all required fields for at least one row' });
+      setMessage({ type: 'error', text: 'Please enter a name for at least one row' });
       return false;
     }
 
     const incompleteRows = rows.filter(row =>
-      (row.name.trim() || row.workshop1 || row.workshop2) &&
-      (!row.name.trim() || !row.workshop1 || !row.workshop2)
+      (row.workshop1 || row.workshop2) && !row.name.trim()
     );
 
     if (incompleteRows.length > 0) {
-      setMessage({ type: 'error', text: 'Please fill in all fields for each row, or remove incomplete rows' });
+      setMessage({ type: 'error', text: 'Please enter a name for every row with a workshop selected' });
       return false;
     }
 
     const assignments = validRows.map(row => ({
       name: row.name.trim(),
-      workshop1: row.workshop1,
-      workshop2: row.workshop2,
+      ...(row.workshop1 ? { workshop1: row.workshop1 } : {}),
+      ...(row.workshop2 ? { workshop2: row.workshop2 } : {}),
     }));
 
     const url = existingSubmission
@@ -424,8 +423,8 @@ const WorkshopsPage = () => {
         <h1 style={styles.title} className="page-title">Workshops</h1>
         <p style={styles.description} className="page-description">
           {existingSubmission 
-            ? 'Edit your workshop assignments below. You can modify, add, or remove entries, or delete your entire submission.'
-            : 'Add workshop assignments by entering a name and two workshops for each delegate.'}
+            ? 'Edit delegate names and workshop assignments below. Workshops can be left blank and added later.'
+            : 'Enter delegate names now. Workshop selections are optional and can be added later.'}
         </p>
       </div>
 
@@ -469,8 +468,8 @@ const WorkshopsPage = () => {
         <div style={styles.tableSection} className="table-section">
           <div style={styles.tableHeader} className="table-header">
             <div style={styles.tableHeaderCell}>Name <span style={styles.required}>*</span></div>
-            <div style={styles.tableHeaderCell}>Workshop 1 <span style={styles.required}>*</span></div>
-            <div style={styles.tableHeaderCell}>Workshop 2 <span style={styles.required}>*</span></div>
+            <div style={styles.tableHeaderCell}>Workshop 1 (optional)</div>
+            <div style={styles.tableHeaderCell}>Workshop 2 (optional)</div>
             <div style={styles.tableHeaderCell}></div>
           </div>
 
