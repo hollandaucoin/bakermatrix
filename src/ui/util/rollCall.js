@@ -161,11 +161,35 @@ export const fetchRollCallStories = async (fileId) => {
   return data.stories;
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const generateRollCallStory = async (fileId, { names, csv } = {}) => {
-  return requestJson(`/api/roll-call/files/${fileId}/stories/generate`, {
+  const started = await requestJson(`/api/roll-call/files/${fileId}/stories/generate`, {
     method: 'POST',
     body: { names, csv },
   });
+
+  // New servers return a job and we poll. Keep a fallback for any old
+  // deploy that still returns the finished story synchronously.
+  if (!started?.jobId) {
+    return started;
+  }
+
+  const jobId = started.jobId;
+  const deadline = Date.now() + 12 * 60 * 1000; // 12 minutes
+
+  while (Date.now() < deadline) {
+    await sleep(3000);
+    const status = await requestJson(`/api/roll-call/stories/generate/${jobId}`);
+    if (status.status === 'done') {
+      return status;
+    }
+    if (status.status === 'error') {
+      throw new Error(status.error || 'Failed to generate script');
+    }
+  }
+
+  throw new Error('Script generation timed out after 12 minutes. Try again.');
 };
 
 export const updateRollCallStory = async (storyId, { story, breakName }) => {
