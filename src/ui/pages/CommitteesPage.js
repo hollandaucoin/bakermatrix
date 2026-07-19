@@ -10,7 +10,10 @@ const normalizeCommitteeRows = (rows) =>
 const rowsAreEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 const CommitteesPage = () => {
+  const [activeTab, setActiveTab] = useState('submit');
   const [committees, setCommittees] = useState([]);
+  const [myCommittees, setMyCommittees] = useState([]);
+  const [myCommitteesLoading, setMyCommitteesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([{ id: Date.now(), name: '', committee: '' }]);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
@@ -35,11 +38,13 @@ const CommitteesPage = () => {
   useEffect(() => {
     fetchCommittees();
     fetchExistingSubmission();
+    fetchMyCommittees();
   }, []);
 
   useEffect(() => {
     const handleSync = () => {
       fetchExistingSubmission({ afterSync: true });
+      fetchMyCommittees();
     };
     window.addEventListener('offline-sync-complete', handleSync);
     return () => window.removeEventListener('offline-sync-complete', handleSync);
@@ -87,6 +92,18 @@ const CommitteesPage = () => {
       setMessage({ type: 'error', text: 'Error loading committees' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMyCommittees = async () => {
+    try {
+      const { data } = await api.get('/api/committees/mine');
+      setMyCommittees(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching owned committees:', error);
+      setMyCommittees([]);
+    } finally {
+      setMyCommitteesLoading(false);
     }
   };
 
@@ -198,6 +215,7 @@ const CommitteesPage = () => {
     const action = existingSubmission ? 'updated' : 'submitted';
     setMessage({ type: 'success', text: `Successfully ${action} ${assignments.length} committee assignment(s)` });
     await fetchExistingSubmission();
+    await fetchMyCommittees();
     return true;
   };
 
@@ -406,12 +424,36 @@ const CommitteesPage = () => {
       <div style={styles.header} className="page-header">
         <h1 style={styles.title} className="page-title">Committees</h1>
         <p style={styles.description} className="page-description">
-          {existingSubmission
-            ? 'Edit delegate names and committee assignments below. Committees can be left blank and added later.'
-            : 'Enter delegate names now. Committee selections are optional and can be added later.'}
+          {activeTab === 'submit'
+            ? (existingSubmission
+              ? 'Edit delegate names and committee assignments below. Committees can be left blank and added later.'
+              : 'Enter delegate names now. Committee selections are optional and can be added later.')
+            : 'See the delegates assigned to committees you lead.'}
         </p>
       </div>
 
+      <div style={styles.tabs}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('submit')}
+          style={{ ...styles.tab, ...(activeTab === 'submit' ? styles.activeTab : {}) }}
+        >
+          Submit Assignments
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('mine');
+            fetchMyCommittees();
+          }}
+          style={{ ...styles.tab, ...(activeTab === 'mine' ? styles.activeTab : {}) }}
+        >
+          My Committee
+        </button>
+      </div>
+
+      {activeTab === 'submit' ? (
+        <>
       {message.text && (
         <div style={{
           ...styles.message,
@@ -573,6 +615,41 @@ const CommitteesPage = () => {
           onSave={handleSaveAndLeave}
         />
       )}
+        </>
+      ) : (
+        <div style={styles.myLists}>
+          {myCommitteesLoading ? (
+            <p style={styles.emptyState}>Loading your committee…</p>
+          ) : myCommittees.length === 0 ? (
+            <p style={styles.emptyState}>
+              You are not assigned to a committee yet. An administrator can assign one from Committee Lists.
+            </p>
+          ) : (
+            myCommittees.map(({ committee, names, count }) => (
+              <section key={committee._id} style={styles.myListCard}>
+                <div style={styles.myListHeader}>
+                  <h2 style={styles.myListTitle}>{committee.name}</h2>
+                  <span style={styles.countBadge}>{count} {count === 1 ? 'delegate' : 'delegates'}</span>
+                </div>
+                {names.length === 0 ? (
+                  <p style={styles.emptyList}>No delegates have been assigned yet.</p>
+                ) : (
+                  <div style={styles.nameGrid}>
+                    {names.map((entry, index) => (
+                      <div key={`${entry.name}-${index}`} style={styles.nameItem}>
+                        <span>{entry.name}</span>
+                        {entry.seniorCounselor?.name && (
+                          <span style={styles.submittedBy}>Submitted by {entry.seniorCounselor.name}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -605,6 +682,89 @@ const styles = {
     margin: '0',
     fontWeight: '400',
     lineHeight: '1.6',
+  },
+  tabs: {
+    display: 'flex',
+    gap: '0.5rem',
+    marginBottom: '2rem',
+    borderBottom: '2px solid #e2e8f0',
+  },
+  tab: {
+    padding: '0.75rem 1.5rem',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    color: '#64748b',
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderBottom: '3px solid transparent',
+    cursor: 'pointer',
+    marginBottom: '-2px',
+  },
+  activeTab: {
+    color: '#3b82f6',
+    borderBottomColor: '#3b82f6',
+  },
+  myLists: {
+    display: 'grid',
+    gap: '1.25rem',
+  },
+  myListCard: {
+    backgroundColor: 'white',
+    padding: '1.5rem',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  },
+  myListHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '1rem',
+    marginBottom: '1rem',
+  },
+  myListTitle: {
+    margin: 0,
+    color: '#1e293b',
+    fontSize: '1.35rem',
+  },
+  countBadge: {
+    padding: '0.3rem 0.65rem',
+    borderRadius: '999px',
+    backgroundColor: '#dbeafe',
+    color: '#1d4ed8',
+    fontSize: '0.8rem',
+    fontWeight: '700',
+    whiteSpace: 'nowrap',
+  },
+  nameGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '0.65rem',
+  },
+  nameItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.15rem',
+    padding: '0.75rem',
+    borderRadius: '8px',
+    backgroundColor: '#f8fafc',
+    color: '#1e293b',
+    fontWeight: '600',
+  },
+  submittedBy: {
+    color: '#64748b',
+    fontSize: '0.75rem',
+    fontWeight: '400',
+  },
+  emptyState: {
+    padding: '2rem',
+    textAlign: 'center',
+    color: '#64748b',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+  },
+  emptyList: {
+    color: '#64748b',
+    margin: 0,
   },
   lastSubmitted: {
     fontSize: '0.875rem',

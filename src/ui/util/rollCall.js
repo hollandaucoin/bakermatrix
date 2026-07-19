@@ -29,7 +29,15 @@ export const deriveBreakName = (text) => {
   return breakName;
 };
 
-export const normalizeRollCallName = (name) => String(name).trim().toLowerCase();
+export const normalizeRollCallName = (name) => String(name)
+  // Curly quotes/apostrophes (’ ‘ “ ”) vs straight ones — CSVs from Excel/Sheets
+  // and Claude's output often disagree; treat them as the same character.
+  .replace(/[\u2018\u2019\u02BC]/g, "'")
+  .replace(/[\u201C\u201D]/g, '"')
+  // Collapse repeated whitespace (double spaces, non-breaking spaces).
+  .replace(/\s+/g, ' ')
+  .trim()
+  .toLowerCase();
 
 export const compareRollCallNames = (csvNames, parsedNames) => {
   const parsedSet = new Set(parsedNames.map(normalizeRollCallName));
