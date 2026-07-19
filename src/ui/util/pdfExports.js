@@ -10,12 +10,16 @@ const formatCounselorTitle = (counselor, councilByName, label) => {
   return label ? `${baseTitle} (${label})` : baseTitle;
 };
 
-const formatActivityTitle = (activityName, seniorCounselor) => {
-  const counselorName = getCounselorName(seniorCounselor);
-  if (!counselorName || counselorName === 'Unknown') {
+const formatActivityTitle = (activityName, seniorCounselors) => {
+  const counselors = Array.isArray(seniorCounselors) ? seniorCounselors : [seniorCounselors];
+  const counselorNames = counselors
+    .filter(Boolean)
+    .map(getCounselorName)
+    .filter((name) => name && name !== 'Unknown');
+  if (counselorNames.length === 0) {
     return activityName;
   }
-  return `${activityName} - ${counselorName}`;
+  return `${activityName} - ${counselorNames.join(' & ')}`;
 };
 
 /**
@@ -149,7 +153,10 @@ export const exportWorkshopEnrollments = (enrollments) => {
     }
 
     const workshopName = enrollment.workshop.name;
-    const enrollmentTitle = formatActivityTitle(workshopName, enrollment.workshop._seniorCounselor);
+    const enrollmentTitle = formatActivityTitle(workshopName, [
+      enrollment.workshop._seniorCounselor,
+      enrollment.workshop._seniorCounselor2,
+    ]);
     
     // Add title
     doc.setFontSize(18);

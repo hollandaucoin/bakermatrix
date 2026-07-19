@@ -15,11 +15,14 @@ const WorkshopAdminPage = () => {
   useEffect(() => {
     if (activeTab === 'submissions') {
       fetchSubmissions();
-      fetchSeniorCounselors();
     } else {
       fetchEnrollments();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    fetchSeniorCounselors();
+  }, []);
 
   const fetchSubmissions = async () => {
     setLoading(true);
@@ -75,6 +78,19 @@ const WorkshopAdminPage = () => {
 
   const handleExportEnrollments = () => {
     exportWorkshopEnrollments(enrollments);
+  };
+
+  const handleUpdateWorkshopCounselors = async (workshopId, counselor1, counselor2) => {
+    const { data } = await api.put(`/api/workshops/${workshopId}`, {
+      _seniorCounselor: counselor1,
+      _seniorCounselor2: counselor2 || null,
+    });
+    setEnrollments((current) => current.map((enrollment) => (
+      enrollment.workshop._id === workshopId
+        ? { ...enrollment, workshop: data }
+        : enrollment
+    )));
+    return data;
   };
 
   return (
@@ -254,7 +270,12 @@ const WorkshopAdminPage = () => {
           onExport={handleExportSubmissions}
         />
       ) : (
-        <EnrollmentsView enrollments={enrollments} onExport={handleExportEnrollments} />
+        <EnrollmentsView
+          enrollments={enrollments}
+          seniorCounselors={seniorCounselors}
+          onUpdateCounselors={handleUpdateWorkshopCounselors}
+          onExport={handleExportEnrollments}
+        />
       )}
     </div>
   );
@@ -462,7 +483,83 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
   );
 };
 
-const EnrollmentsView = ({ enrollments, onExport }) => {
+const WorkshopCounselorsEditor = ({ workshop, seniorCounselors, onSave }) => {
+  const [counselor1, setCounselor1] = useState(workshop._seniorCounselor?._id || '');
+  const [counselor2, setCounselor2] = useState(workshop._seniorCounselor2?._id || '');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setCounselor1(workshop._seniorCounselor?._id || '');
+    setCounselor2(workshop._seniorCounselor2?._id || '');
+  }, [workshop]);
+
+  const handleSave = async () => {
+    if (!counselor1) {
+      setMessage('Choose the first senior counselor.');
+      return;
+    }
+    if (counselor1 === counselor2) {
+      setMessage('Choose two different senior counselors.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setMessage('');
+      await onSave(workshop._id, counselor1, counselor2);
+      setMessage('Senior counselors updated.');
+    } catch (err) {
+      setMessage(err.message || 'Failed to update senior counselors.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={styles.counselorEditor}>
+      <h3 style={styles.sessionTitle}>Workshop Senior Counselors</h3>
+      <div style={styles.counselorFields}>
+        <label style={styles.counselorField}>
+          <span style={styles.counselorLabel}>Senior Counselor 1</span>
+          <select
+            value={counselor1}
+            onChange={(event) => setCounselor1(event.target.value)}
+            style={styles.counselorSelect}
+          >
+            <option value="">Select…</option>
+            {seniorCounselors
+              .filter((counselor) => counselor._id !== counselor2)
+              .map((counselor) => (
+                <option key={counselor._id} value={counselor._id}>{counselor.name}</option>
+              ))}
+          </select>
+        </label>
+        <label style={styles.counselorField}>
+          <span style={styles.counselorLabel}>Senior Counselor 2 (optional)</span>
+          <select
+            value={counselor2}
+            onChange={(event) => setCounselor2(event.target.value)}
+            style={styles.counselorSelect}
+          >
+            <option value="">None</option>
+            {seniorCounselors
+              .filter((counselor) => counselor._id !== counselor1)
+              .map((counselor) => (
+                <option key={counselor._id} value={counselor._id}>{counselor.name}</option>
+              ))}
+          </select>
+        </label>
+        <button type="button" onClick={handleSave} disabled={saving} style={styles.saveCounselorsButton}>
+          {saving ? 'Saving…' : 'Save Counselors'}
+        </button>
+      </div>
+      {message && <p style={styles.counselorMessage}>{message}</p>}
+    </div>
+  );
+};
+
+const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselors, onExport }) => {
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [councilByName, setCouncilByName] = useState({});
 
@@ -488,6 +585,12 @@ const EnrollmentsView = ({ enrollments, onExport }) => {
             ← Back to List
           </button>
         </div>
+
+        <WorkshopCounselorsEditor
+          workshop={workshop.workshop}
+          seniorCounselors={seniorCounselors}
+          onSave={onUpdateCounselors}
+        />
 
         <div style={styles.enrollmentSection} className="admin-enrollment-section">
           <div style={styles.sessionSection}>
@@ -898,6 +1001,53 @@ const styles = {
     padding: '2rem',
     color: '#94a3b8',
     fontSize: '1rem',
+  },
+  counselorEditor: {
+    padding: '1.25rem',
+    marginBottom: '1.5rem',
+    backgroundColor: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+  },
+  counselorFields: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    gap: '1rem',
+  },
+  counselorField: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: '1 1 220px',
+    gap: '0.4rem',
+  },
+  counselorLabel: {
+    color: '#475569',
+    fontSize: '0.8rem',
+    fontWeight: '600',
+  },
+  counselorSelect: {
+    width: '100%',
+    padding: '0.7rem',
+    color: '#1e293b',
+    backgroundColor: 'white',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+  },
+  saveCounselorsButton: {
+    padding: '0.75rem 1rem',
+    color: 'white',
+    backgroundColor: '#3b82f6',
+    border: 'none',
+    borderRadius: '8px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  counselorMessage: {
+    margin: '0.75rem 0 0',
+    color: '#475569',
+    fontSize: '0.85rem',
   },
   enrollmentSection: {
     display: 'grid',
