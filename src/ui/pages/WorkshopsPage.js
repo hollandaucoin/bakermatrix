@@ -13,8 +13,8 @@ const normalizeWorkshopRows = (rows) =>
 
 const rowsAreEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-const WorkshopsPage = () => {
-  const [activeTab, setActiveTab] = useState('submit');
+const WorkshopsPage = ({ canSubmit = true }) => {
+  const [activeTab, setActiveTab] = useState(canSubmit ? 'submit' : 'mine');
   const [workshops, setWorkshops] = useState([]);
   const [myWorkshops, setMyWorkshops] = useState([]);
   const [myWorkshopsLoading, setMyWorkshopsLoading] = useState(true);
@@ -40,14 +40,20 @@ const WorkshopsPage = () => {
   }, [rows, savedSnapshot]);
 
   useEffect(() => {
-    fetchWorkshops();
-    fetchExistingSubmission();
+    if (canSubmit) {
+      fetchWorkshops();
+      fetchExistingSubmission();
+    } else {
+      setLoading(false);
+    }
     fetchMyWorkshops();
   }, []);
 
   useEffect(() => {
     const handleSync = () => {
-      fetchExistingSubmission({ afterSync: true });
+      if (canSubmit) {
+        fetchExistingSubmission({ afterSync: true });
+      }
       fetchMyWorkshops();
     };
     window.addEventListener('offline-sync-complete', handleSync);
@@ -449,6 +455,7 @@ const WorkshopsPage = () => {
       </div>
 
       <div style={styles.tabs}>
+        {canSubmit && (
         <button
           type="button"
           onClick={() => setActiveTab('submit')}
@@ -456,6 +463,7 @@ const WorkshopsPage = () => {
         >
           Submit Assignments
         </button>
+        )}
         <button
           type="button"
           onClick={() => {

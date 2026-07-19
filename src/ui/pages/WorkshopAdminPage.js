@@ -7,6 +7,7 @@ const WorkshopAdminPage = () => {
   const [activeTab, setActiveTab] = useState('submissions'); // 'submissions' or 'workshops'
   const [submissions, setSubmissions] = useState([]);
   const [seniorCounselors, setSeniorCounselors] = useState([]);
+  const [leaderOptions, setLeaderOptions] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,6 +18,7 @@ const WorkshopAdminPage = () => {
       fetchSubmissions();
     } else {
       fetchEnrollments();
+      fetchLeaderOptions();
     }
   }, [activeTab]);
 
@@ -62,6 +64,16 @@ const WorkshopAdminPage = () => {
     }
   };
 
+  const fetchLeaderOptions = async () => {
+    try {
+      const { data } = await api.get('/api/workshops/leader-options');
+      setLeaderOptions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching workshop leader options:', err);
+      setError('Failed to load workshop leader options');
+    }
+  };
+
   const handleViewSubmission = async (submissionId) => {
     try {
       const { data } = await api.get(`/api/workshop-submissions/admin/${submissionId}`);
@@ -80,10 +92,9 @@ const WorkshopAdminPage = () => {
     exportWorkshopEnrollments(enrollments);
   };
 
-  const handleUpdateWorkshopCounselors = async (workshopId, counselor1, counselor2) => {
+  const handleUpdateWorkshopLeaders = async (workshopId, leaders) => {
     const { data } = await api.put(`/api/workshops/${workshopId}`, {
-      _seniorCounselor: counselor1,
-      _seniorCounselor2: counselor2 || null,
+      leaders,
     });
     setEnrollments((current) => current.map((enrollment) => (
       enrollment.workshop._id === workshopId
@@ -272,8 +283,8 @@ const WorkshopAdminPage = () => {
       ) : (
         <EnrollmentsView
           enrollments={enrollments}
-          seniorCounselors={seniorCounselors}
-          onUpdateCounselors={handleUpdateWorkshopCounselors}
+          leaderOptions={leaderOptions}
+          onUpdateLeaders={handleUpdateWorkshopLeaders}
           onExport={handleExportEnrollments}
         />
       )}
@@ -483,32 +494,62 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
   );
 };
 
-const WorkshopCounselorsEditor = ({ workshop, seniorCounselors, onSave }) => {
-  const [counselor1, setCounselor1] = useState(workshop._seniorCounselor?._id || '');
-  const [counselor2, setCounselor2] = useState(workshop._seniorCounselor2?._id || '');
+const leaderValue = (leader) => (
+  leader?.account?._id && leader?.accountModel
+    ? `${leader.accountModel}:${leader.account._id}`
+    : ''
+);
+
+const workshopLeaderValues = (workshop) => {
+  if (workshop.leaders?.length) {
+    return workshop.leaders.map(leaderValue);
+  }
+  return [
+    workshop._seniorCounselor?._id
+      ? `SeniorCounselor:${workshop._seniorCounselor._id}`
+      : '',
+    workshop._seniorCounselor2?._id
+      ? `SeniorCounselor:${workshop._seniorCounselor2._id}`
+      : '',
+  ];
+};
+
+const parseLeaderValue = (value) => {
+  const [accountModel, account] = value.split(':');
+  return { account, accountModel };
+};
+
+const WorkshopLeadersEditor = ({ workshop, leaderOptions, onSave }) => {
+  const initialLeaders = workshopLeaderValues(workshop);
+  const [leader1, setLeader1] = useState(initialLeaders[0] || '');
+  const [leader2, setLeader2] = useState(initialLeaders[1] || '');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    setCounselor1(workshop._seniorCounselor?._id || '');
-    setCounselor2(workshop._seniorCounselor2?._id || '');
+    const values = workshopLeaderValues(workshop);
+    setLeader1(values[0] || '');
+    setLeader2(values[1] || '');
   }, [workshop]);
 
   const handleSave = async () => {
-    if (!counselor1) {
-      setMessage('Choose the first senior counselor.');
+    if (!leader1) {
+      setMessage('Choose the first workshop leader.');
       return;
     }
-    if (counselor1 === counselor2) {
-      setMessage('Choose two different senior counselors.');
+    if (leader1 === leader2) {
+      setMessage('Choose two different workshop leaders.');
       return;
     }
 
     try {
       setSaving(true);
       setMessage('');
-      await onSave(workshop._id, counselor1, counselor2);
-      setMessage('Senior counselors updated.');
+      await onSave(
+        workshop._id,
+        [leader1, leader2].filter(Boolean).map(parseLeaderValue)
+      );
+      setMessage('Workshop leaders updated.');
     } catch (err) {
       setMessage(err.message || 'Failed to update senior counselors.');
     } finally {
@@ -518,40 +559,44 @@ const WorkshopCounselorsEditor = ({ workshop, seniorCounselors, onSave }) => {
 
   return (
     <div style={styles.counselorEditor}>
-      <h3 style={styles.sessionTitle}>Workshop Senior Counselors</h3>
+      <h3 style={styles.sessionTitle}>Workshop Leaders</h3>
       <div style={styles.counselorFields}>
         <label style={styles.counselorField}>
-          <span style={styles.counselorLabel}>Senior Counselor 1</span>
+          <span style={styles.counselorLabel}>Leader 1</span>
           <select
-            value={counselor1}
-            onChange={(event) => setCounselor1(event.target.value)}
+            value={leader1}
+            onChange={(event) => setLeader1(event.target.value)}
             style={styles.counselorSelect}
           >
             <option value="">Select…</option>
-            {seniorCounselors
-              .filter((counselor) => counselor._id !== counselor2)
-              .map((counselor) => (
-                <option key={counselor._id} value={counselor._id}>{counselor.name}</option>
+            {leaderOptions
+              .filter((option) => `${option.accountModel}:${option._id}` !== leader2)
+              .map((option) => (
+                <option key={`${option.accountModel}:${option._id}`} value={`${option.accountModel}:${option._id}`}>
+                  {option.name} ({option.admin ? 'Admin' : option.accountModel === 'SeniorCounselor' ? 'SC' : 'User'})
+                </option>
               ))}
           </select>
         </label>
         <label style={styles.counselorField}>
-          <span style={styles.counselorLabel}>Senior Counselor 2 (optional)</span>
+          <span style={styles.counselorLabel}>Leader 2 (optional)</span>
           <select
-            value={counselor2}
-            onChange={(event) => setCounselor2(event.target.value)}
+            value={leader2}
+            onChange={(event) => setLeader2(event.target.value)}
             style={styles.counselorSelect}
           >
             <option value="">None</option>
-            {seniorCounselors
-              .filter((counselor) => counselor._id !== counselor1)
-              .map((counselor) => (
-                <option key={counselor._id} value={counselor._id}>{counselor.name}</option>
+            {leaderOptions
+              .filter((option) => `${option.accountModel}:${option._id}` !== leader1)
+              .map((option) => (
+                <option key={`${option.accountModel}:${option._id}`} value={`${option.accountModel}:${option._id}`}>
+                  {option.name} ({option.admin ? 'Admin' : option.accountModel === 'SeniorCounselor' ? 'SC' : 'User'})
+                </option>
               ))}
           </select>
         </label>
         <button type="button" onClick={handleSave} disabled={saving} style={styles.saveCounselorsButton}>
-          {saving ? 'Saving…' : 'Save Counselors'}
+          {saving ? 'Saving…' : 'Save Leaders'}
         </button>
       </div>
       {message && <p style={styles.counselorMessage}>{message}</p>}
@@ -559,7 +604,7 @@ const WorkshopCounselorsEditor = ({ workshop, seniorCounselors, onSave }) => {
   );
 };
 
-const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselors, onExport }) => {
+const EnrollmentsView = ({ enrollments, leaderOptions, onUpdateLeaders, onExport }) => {
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [councilByName, setCouncilByName] = useState({});
 
@@ -586,10 +631,10 @@ const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselors, on
           </button>
         </div>
 
-        <WorkshopCounselorsEditor
+        <WorkshopLeadersEditor
           workshop={workshop.workshop}
-          seniorCounselors={seniorCounselors}
-          onSave={onUpdateCounselors}
+          leaderOptions={leaderOptions}
+          onSave={onUpdateLeaders}
         />
 
         <div style={styles.enrollmentSection} className="admin-enrollment-section">

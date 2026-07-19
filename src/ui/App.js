@@ -148,9 +148,7 @@ const App = () => {
                   <WorkshopAdminPage />
                 </OnlineOnly>
               ) : (
-                <SeniorCounselorOnly isSeniorCounselor={isSeniorCounselor} pageName="Workshops">
-                  <WorkshopsPage />
-                </SeniorCounselorOnly>
+                <WorkshopsPage canSubmit={isSeniorCounselor} />
               )}
             </MainLayout>
           </ProtectedRoute>

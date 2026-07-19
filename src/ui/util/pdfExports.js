@@ -153,10 +153,13 @@ export const exportWorkshopEnrollments = (enrollments) => {
     }
 
     const workshopName = enrollment.workshop.name;
-    const enrollmentTitle = formatActivityTitle(workshopName, [
-      enrollment.workshop._seniorCounselor,
-      enrollment.workshop._seniorCounselor2,
-    ]);
+    const workshopLeaders = enrollment.workshop.leaders?.length
+      ? enrollment.workshop.leaders.map((leader) => leader.account)
+      : [
+        enrollment.workshop._seniorCounselor,
+        enrollment.workshop._seniorCounselor2,
+      ];
+    const enrollmentTitle = formatActivityTitle(workshopName, workshopLeaders);
     
     // Add title
     doc.setFontSize(18);
