@@ -500,6 +500,17 @@ const leaderValue = (leader) => (
     : ''
 );
 
+const workshopLeaderNames = (workshop) => {
+  const accounts = workshop.leaders?.length
+    ? workshop.leaders.map((leader) => leader.account)
+    : [workshop._seniorCounselor, workshop._seniorCounselor2];
+  return accounts
+    .filter(Boolean)
+    .map((account) => account.name || account.username)
+    .filter(Boolean)
+    .join(' & ');
+};
+
 const workshopLeaderValues = (workshop) => {
   if (workshop.leaders?.length) {
     return workshop.leaders.map(leaderValue);
@@ -705,8 +716,9 @@ const EnrollmentsView = ({
         </button>
       </div>
       <div style={styles.tableSection}>
-        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr'}} className="admin-table-header">
+        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr'}} className="admin-table-header">
           <div style={styles.tableHeaderCell}>Workshop</div>
+          <div style={styles.tableHeaderCell}>Leader(s)</div>
           <div style={styles.tableHeaderCell}>Session 1</div>
           <div style={styles.tableHeaderCell}>Session 2</div>
           <div style={styles.tableHeaderCell}>Total</div>
@@ -716,7 +728,7 @@ const EnrollmentsView = ({
         {enrollments.map(enrollment => (
           <div
             key={enrollment.workshop._id}
-            style={{...styles.tableRow, gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr'}}
+            style={{...styles.tableRow, gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr'}}
             className="admin-enrollment-row"
             onClick={() => setSelectedWorkshop(enrollment.workshop._id)}
             role="button"
@@ -730,6 +742,9 @@ const EnrollmentsView = ({
           >
             <div style={styles.tableCell} className="admin-table-cell-name">
               <strong>{enrollment.workshop.name}</strong>
+            </div>
+            <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
+              {workshopLeaderNames(enrollment.workshop) || '—'}
             </div>
             <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
               {enrollment.session1Count}

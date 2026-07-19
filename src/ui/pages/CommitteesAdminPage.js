@@ -603,8 +603,9 @@ const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onE
         </button>
       </div>
       <div style={styles.tableSection}>
-        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1fr 1fr'}} className="admin-table-header">
+        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1.5fr 1fr 1fr'}} className="admin-table-header">
           <div style={styles.tableHeaderCell}>Committee</div>
+          <div style={styles.tableHeaderCell}>Leader</div>
           <div style={styles.tableHeaderCell}>Members</div>
           <div style={styles.tableHeaderCell}>Actions</div>
         </div>
@@ -612,7 +613,7 @@ const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onE
         {enrollments.map(enrollment => (
           <div
             key={enrollment.committee._id}
-            style={{...styles.tableRow, gridTemplateColumns: '2fr 1fr 1fr'}}
+            style={{...styles.tableRow, gridTemplateColumns: '2fr 1.5fr 1fr 1fr'}}
             className="admin-enrollment-row"
             onClick={() => setSelectedCommittee(enrollment.committee._id)}
             role="button"
@@ -626,6 +627,9 @@ const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onE
           >
             <div style={styles.tableCell} className="admin-table-cell-name">
               <strong>{enrollment.committee.name}</strong>
+            </div>
+            <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
+              {enrollment.committee._seniorCounselor?.name || enrollment.committee._seniorCounselor?.username || '—'}
             </div>
             <div style={styles.tableCell} className="admin-table-cell-count">
               <strong>{enrollment.count}</strong>
