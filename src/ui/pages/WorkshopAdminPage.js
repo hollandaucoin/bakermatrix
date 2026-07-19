@@ -4,11 +4,12 @@ import api from '../util/api.js';
 import { fetchCouncilNumberByCounselorName, formatCounselorWithCouncil } from '../util/council.js';
 
 const WorkshopAdminPage = () => {
-  const [activeTab, setActiveTab] = useState('submissions'); // 'submissions' or 'workshops'
+  const [activeTab, setActiveTab] = useState('submissions');
   const [submissions, setSubmissions] = useState([]);
   const [seniorCounselors, setSeniorCounselors] = useState([]);
   const [leaderOptions, setLeaderOptions] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
+  const [myEnrollments, setMyEnrollments] = useState([]);
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,8 +17,11 @@ const WorkshopAdminPage = () => {
   useEffect(() => {
     if (activeTab === 'submissions') {
       fetchSubmissions();
-    } else {
+    } else if (activeTab === 'workshops') {
       fetchEnrollments();
+      fetchLeaderOptions();
+    } else {
+      fetchMyEnrollments();
       fetchLeaderOptions();
     }
   }, [activeTab]);
@@ -74,6 +78,20 @@ const WorkshopAdminPage = () => {
     }
   };
 
+  const fetchMyEnrollments = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.get('/api/workshops/mine');
+      setMyEnrollments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching assigned workshops:', err);
+      setError('Failed to load your workshops');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleViewSubmission = async (submissionId) => {
     try {
       const { data } = await api.get(`/api/workshop-submissions/admin/${submissionId}`);
@@ -97,6 +115,11 @@ const WorkshopAdminPage = () => {
       leaders,
     });
     setEnrollments((current) => current.map((enrollment) => (
+      enrollment.workshop._id === workshopId
+        ? { ...enrollment, workshop: data }
+        : enrollment
+    )));
+    setMyEnrollments((current) => current.map((enrollment) => (
       enrollment.workshop._id === workshopId
         ? { ...enrollment, workshop: data }
         : enrollment
@@ -267,6 +290,16 @@ const WorkshopAdminPage = () => {
         >
           Workshop Lists
         </button>
+        <button
+          onClick={() => setActiveTab('mine')}
+          style={{
+            ...styles.tab,
+            ...(activeTab === 'mine' ? styles.activeTab : {})
+          }}
+          className="admin-tab"
+        >
+          My Workshops
+        </button>
       </div>
 
       {loading ? (
@@ -280,12 +313,20 @@ const WorkshopAdminPage = () => {
           onCloseSubmission={() => setSelectedSubmission(null)}
           onExport={handleExportSubmissions}
         />
-      ) : (
+      ) : activeTab === 'workshops' ? (
         <EnrollmentsView
           enrollments={enrollments}
           leaderOptions={leaderOptions}
           onUpdateLeaders={handleUpdateWorkshopLeaders}
           onExport={handleExportEnrollments}
+        />
+      ) : (
+        <EnrollmentsView
+          enrollments={myEnrollments}
+          leaderOptions={leaderOptions}
+          onUpdateLeaders={handleUpdateWorkshopLeaders}
+          onExport={() => exportWorkshopEnrollments(myEnrollments)}
+          emptyMessage="No workshops are assigned to this admin account."
         />
       )}
     </div>
@@ -604,7 +645,13 @@ const WorkshopLeadersEditor = ({ workshop, leaderOptions, onSave }) => {
   );
 };
 
-const EnrollmentsView = ({ enrollments, leaderOptions, onUpdateLeaders, onExport }) => {
+const EnrollmentsView = ({
+  enrollments,
+  leaderOptions,
+  onUpdateLeaders,
+  onExport,
+  emptyMessage = 'No workshop enrollments found',
+}) => {
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [councilByName, setCouncilByName] = useState({});
 
@@ -615,7 +662,7 @@ const EnrollmentsView = ({ enrollments, leaderOptions, onUpdateLeaders, onExport
   if (enrollments.length === 0) {
     return (
       <div style={styles.content}>
-        <p style={styles.emptyMessage}>No workshop enrollments found</p>
+        <p style={styles.emptyMessage}>{emptyMessage}</p>
       </div>
     );
   }
