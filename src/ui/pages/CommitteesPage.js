@@ -631,20 +631,25 @@ const CommitteesPage = () => {
                   <h2 style={styles.myListTitle}>{committee.name}</h2>
                   <span style={styles.countBadge}>{count} {count === 1 ? 'delegate' : 'delegates'}</span>
                 </div>
-                {names.length === 0 ? (
-                  <p style={styles.emptyList}>No delegates have been assigned yet.</p>
-                ) : (
-                  <div style={styles.nameGrid}>
-                    {names.map((entry, index) => (
-                      <div key={`${entry.name}-${index}`} style={styles.nameItem}>
-                        <span>{entry.name}</span>
-                        {entry.seniorCounselor?.name && (
-                          <span style={styles.submittedBy}>Submitted by {entry.seniorCounselor.name}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div style={styles.rosterCard}>
+                  <h3 style={styles.rosterTitle}>
+                    Delegates <span style={styles.rosterCount}>({count})</span>
+                  </h3>
+                  {names.length === 0 ? (
+                    <p style={styles.emptyList}>No delegates assigned yet.</p>
+                  ) : (
+                    <div style={styles.nameGrid}>
+                      {names.map((entry, index) => (
+                        <div key={`${entry.name}-${index}`} style={styles.nameItem}>
+                          <span>{entry.name}</span>
+                          {entry.seniorCounselor?.name && (
+                            <span style={styles.submittedBy}>Submitted by {entry.seniorCounselor.name}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </section>
             ))
           )}
@@ -735,16 +740,29 @@ const styles = {
     fontWeight: '700',
     whiteSpace: 'nowrap',
   },
+  rosterCard: {
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '1rem',
+  },
+  rosterTitle: {
+    margin: '0 0 0.75rem',
+    color: '#334155',
+    fontSize: '1rem',
+  },
+  rosterCount: {
+    color: '#64748b',
+    fontWeight: '500',
+  },
   nameGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: '0.65rem',
+    gap: '0.5rem',
   },
   nameItem: {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.15rem',
-    padding: '0.75rem',
+    padding: '0.7rem',
     borderRadius: '8px',
     backgroundColor: '#f8fafc',
     color: '#1e293b',
