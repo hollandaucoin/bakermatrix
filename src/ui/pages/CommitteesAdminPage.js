@@ -80,6 +80,18 @@ const CommitteesAdminPage = () => {
     exportCommitteeEnrollments(enrollments);
   };
 
+  const handleUpdateCommitteeCounselor = async (committeeId, seniorCounselorId) => {
+    const { data } = await api.put(`/api/committees/${committeeId}`, {
+      _seniorCounselor: seniorCounselorId,
+    });
+    setEnrollments((current) => current.map((enrollment) => (
+      enrollment.committee._id === committeeId
+        ? { ...enrollment, committee: data }
+        : enrollment
+    )));
+    return data;
+  };
+
   if (loading) {
     return (
       <div style={styles.container}>
@@ -256,6 +268,8 @@ const CommitteesAdminPage = () => {
       ) : (
         <EnrollmentsView
           enrollments={enrollments}
+          seniorCounselors={seniorCounselors}
+          onUpdateCounselor={handleUpdateCommitteeCounselor}
           onExport={handleExportEnrollments}
         />
       )}
@@ -461,7 +475,61 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
   );
 };
 
-const EnrollmentsView = ({ enrollments, onExport }) => {
+const CommitteeCounselorEditor = ({ committee, seniorCounselors, onSave }) => {
+  const [seniorCounselorId, setSeniorCounselorId] = useState(committee._seniorCounselor?._id || '');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setSeniorCounselorId(committee._seniorCounselor?._id || '');
+  }, [committee]);
+
+  const handleSave = async () => {
+    if (!seniorCounselorId) {
+      setMessage('Choose a senior counselor.');
+      return;
+    }
+    try {
+      setSaving(true);
+      setMessage('');
+      await onSave(committee._id, seniorCounselorId);
+      setMessage('Senior counselor updated.');
+    } catch (err) {
+      setMessage(err.message || 'Failed to update senior counselor.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={styles.counselorEditor}>
+      <h3 style={styles.sessionTitle}>Committee Senior Counselor</h3>
+      <div style={styles.counselorFields}>
+        <label style={styles.counselorField}>
+          <span style={styles.counselorLabel}>Senior Counselor</span>
+          <select
+            value={seniorCounselorId}
+            onChange={(event) => setSeniorCounselorId(event.target.value)}
+            style={styles.counselorSelect}
+          >
+            <option value="">Select…</option>
+            {seniorCounselors.map((seniorCounselor) => (
+              <option key={seniorCounselor._id} value={seniorCounselor._id}>
+                {seniorCounselor.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={handleSave} disabled={saving} style={styles.saveCounselorButton}>
+          {saving ? 'Saving…' : 'Save Senior Counselor'}
+        </button>
+      </div>
+      {message && <p style={styles.counselorMessage}>{message}</p>}
+    </div>
+  );
+};
+
+const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onExport }) => {
   const [selectedCommittee, setSelectedCommittee] = useState(null);
   const [councilByName, setCouncilByName] = useState({});
 
@@ -487,6 +555,12 @@ const EnrollmentsView = ({ enrollments, onExport }) => {
             ← Back to List
           </button>
         </div>
+
+        <CommitteeCounselorEditor
+          committee={committee.committee}
+          seniorCounselors={seniorCounselors}
+          onSave={onUpdateCounselor}
+        />
 
         <div style={styles.enrollmentSection}>
           <div style={styles.sessionSection}>
@@ -871,6 +945,53 @@ const styles = {
     padding: '2rem',
     color: '#94a3b8',
     fontSize: '1rem',
+  },
+  counselorEditor: {
+    padding: '1.25rem',
+    marginBottom: '1.5rem',
+    backgroundColor: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+  },
+  counselorFields: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    gap: '1rem',
+  },
+  counselorField: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: '1 1 260px',
+    gap: '0.4rem',
+  },
+  counselorLabel: {
+    color: '#475569',
+    fontSize: '0.8rem',
+    fontWeight: '600',
+  },
+  counselorSelect: {
+    width: '100%',
+    padding: '0.7rem',
+    color: '#1e293b',
+    backgroundColor: 'white',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+  },
+  saveCounselorButton: {
+    padding: '0.75rem 1rem',
+    color: 'white',
+    backgroundColor: '#3b82f6',
+    border: 'none',
+    borderRadius: '8px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  counselorMessage: {
+    margin: '0.75rem 0 0',
+    color: '#475569',
+    fontSize: '0.85rem',
   },
   enrollmentSection: {
     display: 'grid',
