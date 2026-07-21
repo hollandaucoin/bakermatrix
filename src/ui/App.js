@@ -133,9 +133,7 @@ const App = () => {
                   <CommitteesAdminPage />
                 </OnlineOnly>
               ) : (
-                <SeniorCounselorOnly isSeniorCounselor={isSeniorCounselor} pageName="Committees">
-                  <CommitteesPage />
-                </SeniorCounselorOnly>
+                <CommitteesPage canSubmit={isSeniorCounselor} />
               )}
             </MainLayout>
           </ProtectedRoute>

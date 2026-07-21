@@ -3,6 +3,7 @@ import api from '../util/api.js';
 import { useNavigationGuard } from '../context/NavigationGuardContext.js';
 import UnsavedChangesPopup from '../components/UnsavedChangesPopup.js';
 import ConfirmPopup from '../components/ConfirmPopup.js';
+import { formatActivityWithLocation } from '../util/locations.js';
 
 const normalizeWorkshopRows = (rows) =>
   rows.map(({ name, workshop1, workshop2 }) => ({
@@ -14,7 +15,7 @@ const normalizeWorkshopRows = (rows) =>
 const rowsAreEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 const WorkshopsPage = ({ canSubmit = true }) => {
-  const [activeTab, setActiveTab] = useState(canSubmit ? 'submit' : 'mine');
+  const [activeTab, setActiveTab] = useState(canSubmit ? 'submit' : 'locations');
   const [workshops, setWorkshops] = useState([]);
   const [myWorkshops, setMyWorkshops] = useState([]);
   const [myWorkshopsLoading, setMyWorkshopsLoading] = useState(true);
@@ -40,11 +41,9 @@ const WorkshopsPage = ({ canSubmit = true }) => {
   }, [rows, savedSnapshot]);
 
   useEffect(() => {
+    fetchWorkshops();
     if (canSubmit) {
-      fetchWorkshops();
       fetchExistingSubmission();
-    } else {
-      setLoading(false);
     }
     fetchMyWorkshops();
   }, []);
@@ -55,6 +54,7 @@ const WorkshopsPage = ({ canSubmit = true }) => {
         fetchExistingSubmission({ afterSync: true });
       }
       fetchMyWorkshops();
+      fetchWorkshops();
     };
     window.addEventListener('offline-sync-complete', handleSync);
     return () => window.removeEventListener('offline-sync-complete', handleSync);
@@ -450,7 +450,9 @@ const WorkshopsPage = ({ canSubmit = true }) => {
             ? (existingSubmission
               ? 'Edit delegate names and workshop assignments below. Workshops can be left blank and added later.'
               : 'Enter delegate names now. Workshop selections are optional and can be added later.')
-            : 'See the delegates assigned to workshops you lead.'}
+            : activeTab === 'mine'
+              ? 'See the delegates assigned to workshops you lead.'
+              : 'Find where every workshop meets.'}
         </p>
       </div>
 
@@ -473,6 +475,16 @@ const WorkshopsPage = ({ canSubmit = true }) => {
           style={{ ...styles.tab, ...(activeTab === 'mine' ? styles.activeTab : {}) }}
         >
           My Workshops
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('locations');
+            fetchWorkshops();
+          }}
+          style={{ ...styles.tab, ...(activeTab === 'locations' ? styles.activeTab : {}) }}
+        >
+          Locations
         </button>
       </div>
 
@@ -559,7 +571,7 @@ const WorkshopsPage = ({ canSubmit = true }) => {
                     .filter(workshop => workshop._id !== row.workshop2)
                     .map(workshop => (
                       <option key={workshop._id} value={workshop._id}>
-                        {workshop.name}
+                        {formatActivityWithLocation(workshop.name, workshop.location)}
                       </option>
                     ))}
                 </select>
@@ -576,7 +588,7 @@ const WorkshopsPage = ({ canSubmit = true }) => {
                     .filter(workshop => workshop._id !== row.workshop1)
                     .map(workshop => (
                       <option key={workshop._id} value={workshop._id}>
-                        {workshop.name}
+                        {formatActivityWithLocation(workshop.name, workshop.location)}
                       </option>
                     ))}
                 </select>
@@ -660,7 +672,7 @@ const WorkshopsPage = ({ canSubmit = true }) => {
         />
       )}
         </>
-      ) : (
+      ) : activeTab === 'mine' ? (
         <div style={styles.myLists}>
           {myWorkshopsLoading ? (
             <p style={styles.emptyState}>Loading your workshops…</p>
@@ -672,7 +684,12 @@ const WorkshopsPage = ({ canSubmit = true }) => {
             myWorkshops.map(({ workshop, session1, session2, session1Count, session2Count }) => (
               <section key={workshop._id} style={styles.myListCard}>
                 <div style={styles.myListHeader}>
-                  <h2 style={styles.myListTitle}>{workshop.name}</h2>
+                  <div>
+                    <h2 style={styles.myListTitle}>{workshop.name}</h2>
+                    {workshop.location && (
+                      <p style={styles.locationLabel}>{workshop.location}</p>
+                    )}
+                  </div>
                   <span style={styles.countBadge}>
                     {session1Count + session2Count} total
                   </span>
@@ -705,6 +722,27 @@ const WorkshopsPage = ({ canSubmit = true }) => {
                 </div>
               </section>
             ))
+          )}
+        </div>
+      ) : (
+        <div style={styles.directoryCard}>
+          {loading ? (
+            <p style={styles.emptyState}>Loading locations…</p>
+          ) : workshops.length === 0 ? (
+            <p style={styles.emptyState}>No workshops found.</p>
+          ) : (
+            <>
+              <div style={styles.directoryHeader}>
+                <span>Workshop</span>
+                <span>Location</span>
+              </div>
+              {workshops.map((workshop) => (
+                <div key={workshop._id} style={styles.directoryRow}>
+                  <span style={styles.directoryName}>{workshop.name}</span>
+                  <span style={styles.directoryLocation}>{workshop.location || '—'}</span>
+                </div>
+              ))}
+            </>
           )}
         </div>
       )}
@@ -784,6 +822,12 @@ const styles = {
     color: '#1e293b',
     fontSize: '1.35rem',
   },
+  locationLabel: {
+    margin: '0.25rem 0 0',
+    color: '#64748b',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+  },
   countBadge: {
     padding: '0.3rem 0.65rem',
     borderRadius: '999px',
@@ -841,6 +885,41 @@ const styles = {
   emptyList: {
     color: '#64748b',
     margin: 0,
+  },
+  directoryCard: {
+    backgroundColor: 'white',
+    padding: '1.5rem',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  },
+  directoryHeader: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr',
+    gap: '1rem',
+    padding: '0 0.75rem 0.75rem',
+    marginBottom: '0.5rem',
+    borderBottom: '1px solid #e2e8f0',
+    color: '#64748b',
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  directoryRow: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr',
+    gap: '1rem',
+    padding: '0.85rem 0.75rem',
+    borderBottom: '1px solid #f1f5f9',
+    alignItems: 'center',
+  },
+  directoryName: {
+    color: '#1e293b',
+    fontWeight: '600',
+  },
+  directoryLocation: {
+    color: '#334155',
+    fontWeight: '500',
   },
   lastSubmitted: {
     fontSize: '0.875rem',

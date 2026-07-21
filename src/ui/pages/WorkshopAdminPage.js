@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { exportWorkshopSubmissions, exportWorkshopEnrollments } from '../util/pdfExports.js';
 import api from '../util/api.js';
 import { fetchCouncilNumberByCounselorName, formatCounselorWithCouncil } from '../util/council.js';
+import { fetchLocationAssignments, partitionSessionLocations } from '../util/locations.js';
 
 const WorkshopAdminPage = () => {
   const [activeTab, setActiveTab] = useState('submissions');
@@ -99,6 +100,16 @@ const WorkshopAdminPage = () => {
     setEnrollments((current) => current.map((enrollment) => (
       enrollment.workshop._id === workshopId
         ? { ...enrollment, workshop: data }
+        : enrollment
+    )));
+    return data;
+  };
+
+  const handleUpdateWorkshopLocation = async (workshopId, location) => {
+    const { data } = await api.put(`/api/workshops/${workshopId}`, { location });
+    setEnrollments((current) => current.map((enrollment) => (
+      String(enrollment.workshop._id) === String(workshopId)
+        ? { ...enrollment, workshop: { ...enrollment.workshop, ...data, location: data.location || null } }
         : enrollment
     )));
     return data;
@@ -285,6 +296,7 @@ const WorkshopAdminPage = () => {
           enrollments={enrollments}
           leaderOptions={leaderOptions}
           onUpdateLeaders={handleUpdateWorkshopLeaders}
+          onUpdateLocation={handleUpdateWorkshopLocation}
           onExport={handleExportEnrollments}
         />
       )}
@@ -615,10 +627,94 @@ const WorkshopLeadersEditor = ({ workshop, leaderOptions, onSave }) => {
   );
 };
 
+const WorkshopLocationEditor = ({ workshop, onSave }) => {
+  const [location, setLocation] = useState(workshop.location || '');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [assignments, setAssignments] = useState([]);
+
+  useEffect(() => {
+    setLocation(workshop.location || '');
+  }, [workshop]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLocationAssignments().then((data) => {
+      if (!cancelled) setAssignments(data);
+    });
+    return () => { cancelled = true; };
+  }, [workshop._id, workshop.location]);
+
+  const { available, occupied } = partitionSessionLocations(
+    workshop.location || '',
+    assignments,
+    `workshop:${workshop._id}`
+  );
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setMessage('');
+      await onSave(workshop._id, location || null);
+      setMessage('Location updated.');
+      setAssignments(await fetchLocationAssignments());
+    } catch (err) {
+      setMessage(err.message || 'Failed to update location.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={styles.counselorEditor}>
+      <h3 style={styles.sessionTitle}>Workshop Location</h3>
+      <div style={styles.counselorFields}>
+        <label style={styles.counselorField}>
+          <span style={styles.counselorLabel}>Location</span>
+          <select
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            style={styles.counselorSelect}
+          >
+            <option value="">None</option>
+            <optgroup label="Available">
+              {available.map((room) => (
+                <option key={room} value={room}>{room}</option>
+              ))}
+            </optgroup>
+            {showAll && occupied.length > 0 && (
+              <optgroup label="Already assigned">
+                {occupied.map(({ location: room, label }) => (
+                  <option key={room} value={room}>{room} — {label}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </label>
+        <button type="button" onClick={handleSave} disabled={saving} style={styles.saveCounselorsButton}>
+          {saving ? 'Saving…' : 'Save Location'}
+        </button>
+      </div>
+      {occupied.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((current) => !current)}
+          style={styles.showAllLocationsButton}
+        >
+          {showAll ? 'Hide assigned locations' : 'Show all locations (for swaps)'}
+        </button>
+      )}
+      {message && <p style={styles.counselorMessage}>{message}</p>}
+    </div>
+  );
+};
+
 const EnrollmentsView = ({
   enrollments,
   leaderOptions,
   onUpdateLeaders,
+  onUpdateLocation,
   onExport,
 }) => {
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
@@ -647,6 +743,10 @@ const EnrollmentsView = ({
           </button>
         </div>
 
+        <WorkshopLocationEditor
+          workshop={workshop.workshop}
+          onSave={onUpdateLocation}
+        />
         <WorkshopLeadersEditor
           workshop={workshop.workshop}
           leaderOptions={leaderOptions}
@@ -716,9 +816,10 @@ const EnrollmentsView = ({
         </button>
       </div>
       <div style={styles.tableSection}>
-        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr'}} className="admin-table-header">
+        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1.25fr 1.25fr 1fr 1fr 1fr 1fr'}} className="admin-table-header">
           <div style={styles.tableHeaderCell}>Workshop</div>
           <div style={styles.tableHeaderCell}>Leader(s)</div>
+          <div style={styles.tableHeaderCell}>Location</div>
           <div style={styles.tableHeaderCell}>Session 1</div>
           <div style={styles.tableHeaderCell}>Session 2</div>
           <div style={styles.tableHeaderCell}>Total</div>
@@ -728,7 +829,7 @@ const EnrollmentsView = ({
         {enrollments.map(enrollment => (
           <div
             key={enrollment.workshop._id}
-            style={{...styles.tableRow, gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr'}}
+            style={{...styles.tableRow, gridTemplateColumns: '2fr 1.25fr 1.25fr 1fr 1fr 1fr 1fr'}}
             className="admin-enrollment-row"
             onClick={() => setSelectedWorkshop(enrollment.workshop._id)}
             role="button"
@@ -745,6 +846,9 @@ const EnrollmentsView = ({
             </div>
             <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
               {workshopLeaderNames(enrollment.workshop) || '—'}
+            </div>
+            <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
+              {enrollment.workshop.location || '—'}
             </div>
             <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
               {enrollment.session1Count}
@@ -1113,6 +1217,17 @@ const styles = {
     margin: '0.75rem 0 0',
     color: '#475569',
     fontSize: '0.85rem',
+  },
+  showAllLocationsButton: {
+    marginTop: '0.75rem',
+    padding: 0,
+    color: '#3b82f6',
+    background: 'none',
+    border: 'none',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    textAlign: 'left',
   },
   enrollmentSection: {
     display: 'grid',

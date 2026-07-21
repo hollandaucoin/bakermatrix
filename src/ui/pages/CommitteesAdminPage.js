@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { exportCommitteeSubmissions, exportCommitteeEnrollments } from '../util/pdfExports.js';
 import api from '../util/api.js';
 import { fetchCouncilNumberByCounselorName, formatCounselorWithCouncil } from '../util/council.js';
+import { fetchLocationAssignments, partitionSessionLocations } from '../util/locations.js';
 
 const CommitteesAdminPage = () => {
   const [activeTab, setActiveTab] = useState('submissions'); // 'submissions' or 'committees'
@@ -18,6 +19,7 @@ const CommitteesAdminPage = () => {
       fetchSeniorCounselors();
     } else {
       fetchEnrollments();
+      fetchSeniorCounselors();
     }
   }, [activeTab]);
 
@@ -85,7 +87,17 @@ const CommitteesAdminPage = () => {
       _seniorCounselor: seniorCounselorId,
     });
     setEnrollments((current) => current.map((enrollment) => (
-      enrollment.committee._id === committeeId
+      String(enrollment.committee._id) === String(committeeId)
+        ? { ...enrollment, committee: data }
+        : enrollment
+    )));
+    return data;
+  };
+
+  const handleUpdateCommitteeLocation = async (committeeId, location) => {
+    const { data } = await api.put(`/api/committees/${committeeId}`, { location });
+    setEnrollments((current) => current.map((enrollment) => (
+      String(enrollment.committee._id) === String(committeeId)
         ? { ...enrollment, committee: data }
         : enrollment
     )));
@@ -270,6 +282,7 @@ const CommitteesAdminPage = () => {
           enrollments={enrollments}
           seniorCounselors={seniorCounselors}
           onUpdateCounselor={handleUpdateCommitteeCounselor}
+          onUpdateLocation={handleUpdateCommitteeLocation}
           onExport={handleExportEnrollments}
         />
       )}
@@ -475,14 +488,39 @@ const SubmissionsView = ({ submissions, seniorCounselors, selectedSubmission, on
   );
 };
 
-const CommitteeCounselorEditor = ({ committee, seniorCounselors, onSave }) => {
-  const [seniorCounselorId, setSeniorCounselorId] = useState(committee._seniorCounselor?._id || '');
+const CommitteeCounselorEditor = ({ committee, seniorCounselors, enrollments, onSave }) => {
+  const [seniorCounselorId, setSeniorCounselorId] = useState(
+    String(committee._seniorCounselor?._id || '')
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    setSeniorCounselorId(committee._seniorCounselor?._id || '');
+    setSeniorCounselorId(String(committee._seniorCounselor?._id || ''));
   }, [committee]);
+
+  const currentId = String(committee._seniorCounselor?._id || '');
+  const assignedElsewhere = new Map();
+  enrollments.forEach((enrollment) => {
+    const assignedId = String(enrollment.committee._seniorCounselor?._id || '');
+    if (!assignedId || String(enrollment.committee._id) === String(committee._id)) return;
+    assignedElsewhere.set(assignedId, enrollment.committee.name);
+  });
+
+  const available = seniorCounselors.filter((sc) => !assignedElsewhere.has(String(sc._id)));
+  const occupied = seniorCounselors
+    .filter((sc) => assignedElsewhere.has(String(sc._id)))
+    .map((sc) => ({
+      ...sc,
+      assignedTo: assignedElsewhere.get(String(sc._id)),
+    }));
+
+  // Keep the current counselor selectable even if assignment data is briefly stale.
+  if (currentId && !available.some((sc) => String(sc._id) === currentId) && !occupied.some((sc) => String(sc._id) === currentId)) {
+    const current = seniorCounselors.find((sc) => String(sc._id) === currentId);
+    if (current) available.push(current);
+  }
 
   const handleSave = async () => {
     if (!seniorCounselorId) {
@@ -513,23 +551,126 @@ const CommitteeCounselorEditor = ({ committee, seniorCounselors, onSave }) => {
             style={styles.counselorSelect}
           >
             <option value="">Select…</option>
-            {seniorCounselors.map((seniorCounselor) => (
-              <option key={seniorCounselor._id} value={seniorCounselor._id}>
-                {seniorCounselor.name}
-              </option>
-            ))}
+            <optgroup label="Available">
+              {available.map((seniorCounselor) => (
+                <option key={String(seniorCounselor._id)} value={String(seniorCounselor._id)}>
+                  {seniorCounselor.name}
+                </option>
+              ))}
+            </optgroup>
+            {showAll && occupied.length > 0 && (
+              <optgroup label="Already assigned">
+                {occupied.map((seniorCounselor) => (
+                  <option key={String(seniorCounselor._id)} value={String(seniorCounselor._id)}>
+                    {seniorCounselor.name} — {seniorCounselor.assignedTo}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </label>
         <button type="button" onClick={handleSave} disabled={saving} style={styles.saveCounselorButton}>
           {saving ? 'Saving…' : 'Save Senior Counselor'}
         </button>
       </div>
+      {occupied.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((current) => !current)}
+          style={styles.showAllLocationsButton}
+        >
+          {showAll ? 'Hide assigned counselors' : 'Show all counselors (for swaps)'}
+        </button>
+      )}
       {message && <p style={styles.counselorMessage}>{message}</p>}
     </div>
   );
 };
 
-const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onExport }) => {
+const CommitteeLocationEditor = ({ committee, onSave }) => {
+  const [location, setLocation] = useState(committee.location || '');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [assignments, setAssignments] = useState([]);
+
+  useEffect(() => {
+    setLocation(committee.location || '');
+  }, [committee]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLocationAssignments().then((data) => {
+      if (!cancelled) setAssignments(data);
+    });
+    return () => { cancelled = true; };
+  }, [committee._id, committee.location]);
+
+  const { available, occupied } = partitionSessionLocations(
+    committee.location || '',
+    assignments,
+    `committee:${committee._id}`
+  );
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setMessage('');
+      await onSave(committee._id, location || null);
+      setMessage('Location updated.');
+      setAssignments(await fetchLocationAssignments());
+    } catch (err) {
+      setMessage(err.message || 'Failed to update location.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={styles.counselorEditor}>
+      <h3 style={styles.sessionTitle}>Committee Location</h3>
+      <div style={styles.counselorFields}>
+        <label style={styles.counselorField}>
+          <span style={styles.counselorLabel}>Location</span>
+          <select
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            style={styles.counselorSelect}
+          >
+            <option value="">None</option>
+            <optgroup label="Available">
+              {available.map((room) => (
+                <option key={room} value={room}>{room}</option>
+              ))}
+            </optgroup>
+            {showAll && occupied.length > 0 && (
+              <optgroup label="Already assigned">
+                {occupied.map(({ location: room, label }) => (
+                  <option key={room} value={room}>{room} — {label}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </label>
+        <button type="button" onClick={handleSave} disabled={saving} style={styles.saveCounselorButton}>
+          {saving ? 'Saving…' : 'Save Location'}
+        </button>
+      </div>
+      {occupied.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll((current) => !current)}
+          style={styles.showAllLocationsButton}
+        >
+          {showAll ? 'Hide assigned locations' : 'Show all locations (for swaps)'}
+        </button>
+      )}
+      {message && <p style={styles.counselorMessage}>{message}</p>}
+    </div>
+  );
+};
+
+const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onUpdateLocation, onExport }) => {
   const [selectedCommittee, setSelectedCommittee] = useState(null);
   const [councilByName, setCouncilByName] = useState({});
 
@@ -556,9 +697,14 @@ const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onE
           </button>
         </div>
 
+        <CommitteeLocationEditor
+          committee={committee.committee}
+          onSave={onUpdateLocation}
+        />
         <CommitteeCounselorEditor
           committee={committee.committee}
           seniorCounselors={seniorCounselors}
+          enrollments={enrollments}
           onSave={onUpdateCounselor}
         />
 
@@ -603,9 +749,10 @@ const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onE
         </button>
       </div>
       <div style={styles.tableSection}>
-        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1.5fr 1fr 1fr'}} className="admin-table-header">
+        <div style={{...styles.tableHeader, gridTemplateColumns: '2fr 1.25fr 1.25fr 1fr 1fr'}} className="admin-table-header">
           <div style={styles.tableHeaderCell}>Committee</div>
           <div style={styles.tableHeaderCell}>Leader</div>
+          <div style={styles.tableHeaderCell}>Location</div>
           <div style={styles.tableHeaderCell}>Members</div>
           <div style={styles.tableHeaderCell}>Actions</div>
         </div>
@@ -613,7 +760,7 @@ const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onE
         {enrollments.map(enrollment => (
           <div
             key={enrollment.committee._id}
-            style={{...styles.tableRow, gridTemplateColumns: '2fr 1.5fr 1fr 1fr'}}
+            style={{...styles.tableRow, gridTemplateColumns: '2fr 1.25fr 1.25fr 1fr 1fr'}}
             className="admin-enrollment-row"
             onClick={() => setSelectedCommittee(enrollment.committee._id)}
             role="button"
@@ -630,6 +777,9 @@ const EnrollmentsView = ({ enrollments, seniorCounselors, onUpdateCounselor, onE
             </div>
             <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
               {enrollment.committee._seniorCounselor?.name || enrollment.committee._seniorCounselor?.username || '—'}
+            </div>
+            <div style={{...styles.tableCell, ...styles.tableCellExtra}} className="admin-table-cell-extra">
+              {enrollment.committee.location || '—'}
             </div>
             <div style={styles.tableCell} className="admin-table-cell-count">
               <strong>{enrollment.count}</strong>
@@ -996,6 +1146,17 @@ const styles = {
     margin: '0.75rem 0 0',
     color: '#475569',
     fontSize: '0.85rem',
+  },
+  showAllLocationsButton: {
+    marginTop: '0.75rem',
+    padding: 0,
+    color: '#3b82f6',
+    background: 'none',
+    border: 'none',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    textAlign: 'left',
   },
   enrollmentSection: {
     display: 'grid',

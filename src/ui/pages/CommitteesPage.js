@@ -3,14 +3,15 @@ import api from '../util/api.js';
 import { useNavigationGuard } from '../context/NavigationGuardContext.js';
 import UnsavedChangesPopup from '../components/UnsavedChangesPopup.js';
 import ConfirmPopup from '../components/ConfirmPopup.js';
+import { formatActivityWithLocation } from '../util/locations.js';
 
 const normalizeCommitteeRows = (rows) =>
   rows.map(({ name, committee }) => ({ name: name.trim(), committee }));
 
 const rowsAreEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-const CommitteesPage = () => {
-  const [activeTab, setActiveTab] = useState('submit');
+const CommitteesPage = ({ canSubmit = true }) => {
+  const [activeTab, setActiveTab] = useState(canSubmit ? 'submit' : 'locations');
   const [committees, setCommittees] = useState([]);
   const [myCommittees, setMyCommittees] = useState([]);
   const [myCommitteesLoading, setMyCommitteesLoading] = useState(true);
@@ -22,6 +23,7 @@ const CommitteesPage = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [existingSubmission, setExistingSubmission] = useState(null);
+  const [showAllCommittees, setShowAllCommittees] = useState(false);
 
   const {
     registerGuard,
@@ -37,14 +39,21 @@ const CommitteesPage = () => {
 
   useEffect(() => {
     fetchCommittees();
-    fetchExistingSubmission();
-    fetchMyCommittees();
+    if (canSubmit) {
+      fetchExistingSubmission();
+      fetchMyCommittees();
+    } else {
+      setMyCommitteesLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     const handleSync = () => {
-      fetchExistingSubmission({ afterSync: true });
-      fetchMyCommittees();
+      if (canSubmit) {
+        fetchExistingSubmission({ afterSync: true });
+        fetchMyCommittees();
+      }
+      fetchCommittees();
     };
     window.addEventListener('offline-sync-complete', handleSync);
     return () => window.removeEventListener('offline-sync-complete', handleSync);
@@ -168,6 +177,41 @@ const CommitteesPage = () => {
       return row;
     }));
     setMessage({ type: '', text: '' });
+  };
+
+  const partitionCommitteesForRow = (row) => {
+    const selectedElsewhere = new Set(
+      rows
+        .filter((entry) => entry.id !== row.id && entry.committee)
+        .map((entry) => String(entry.committee))
+    );
+    const currentId = String(row.committee || '');
+
+    let available = committees.filter((committee) => {
+      const id = String(committee._id);
+      if (selectedElsewhere.has(id)) return false;
+      return (committee.enrollmentCount || 0) === 0;
+    });
+    let occupied = committees.filter((committee) => {
+      const id = String(committee._id);
+      if (id === currentId) return false;
+      return selectedElsewhere.has(id) || (committee.enrollmentCount || 0) > 0;
+    });
+
+    // Keep the current selection visible even when it's otherwise "taken".
+    if (currentId && !available.some((committee) => String(committee._id) === currentId)) {
+      const current = committees.find((committee) => String(committee._id) === currentId);
+      if (current) available = [...available, current];
+    }
+
+    return { available, occupied };
+  };
+
+  const formatCommitteeOption = (committee, { selectedElsewhere = false } = {}) => {
+    const base = formatActivityWithLocation(committee.name, committee.location);
+    if (selectedElsewhere) return `${base} (already in your list)`;
+    if (committee.enrollmentCount > 0) return `${base} (${committee.enrollmentCount} signed up)`;
+    return base;
   };
 
   const submitAssignments = async () => {
@@ -428,27 +472,43 @@ const CommitteesPage = () => {
             ? (existingSubmission
               ? 'Edit delegate names and committee assignments below. Committees can be left blank and added later.'
               : 'Enter delegate names now. Committee selections are optional and can be added later.')
-            : 'See the delegates assigned to committees you lead.'}
+            : activeTab === 'mine'
+              ? 'See the delegates assigned to committees you lead.'
+              : 'Find where every committee meets.'}
         </p>
       </div>
 
       <div style={styles.tabs}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('submit')}
-          style={{ ...styles.tab, ...(activeTab === 'submit' ? styles.activeTab : {}) }}
-        >
-          Submit Assignments
-        </button>
+        {canSubmit && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('submit')}
+            style={{ ...styles.tab, ...(activeTab === 'submit' ? styles.activeTab : {}) }}
+          >
+            Submit Assignments
+          </button>
+        )}
+        {canSubmit && (
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('mine');
+              fetchMyCommittees();
+            }}
+            style={{ ...styles.tab, ...(activeTab === 'mine' ? styles.activeTab : {}) }}
+          >
+            My Committee
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
-            setActiveTab('mine');
-            fetchMyCommittees();
+            setActiveTab('locations');
+            fetchCommittees();
           }}
-          style={{ ...styles.tab, ...(activeTab === 'mine' ? styles.activeTab : {}) }}
+          style={{ ...styles.tab, ...(activeTab === 'locations' ? styles.activeTab : {}) }}
         >
-          My Committee
+          Locations
         </button>
       </div>
 
@@ -494,7 +554,16 @@ const CommitteesPage = () => {
         <div style={styles.tableSection} className="table-section">
           <div style={styles.tableHeader} className="table-header">
             <div style={styles.tableHeaderCell}>Name <span style={styles.required}>*</span></div>
-            <div style={styles.tableHeaderCell}>Committee (optional)</div>
+            <div style={{ ...styles.tableHeaderCell, ...styles.committeeHeaderCell }}>
+              <span>Committee (optional)</span>
+              <button
+                type="button"
+                onClick={() => setShowAllCommittees((current) => !current)}
+                style={styles.showAllCommitteesButton}
+              >
+                {showAllCommittees ? 'Hide assigned' : 'Show all'}
+              </button>
+            </div>
             <div style={styles.tableHeaderCell}></div>
           </div>
 
@@ -523,19 +592,42 @@ const CommitteesPage = () => {
                 />
               </div>
               <div style={styles.tableCell} className="table-cell" data-label="Committee">
-                <select
-                  value={row.committee}
-                  onChange={(e) => handleUpdateRow(row.id, 'committee', e.target.value)}
-                  style={styles.select}
-                  disabled={loading}
-                >
-                  <option value="">Select...</option>
-                  {committees.map(committee => (
-                    <option key={committee._id} value={committee._id}>
-                      {committee.name}
-                    </option>
-                  ))}
-                </select>
+                {(() => {
+                  const selectedElsewhere = new Set(
+                    rows
+                      .filter((entry) => entry.id !== row.id && entry.committee)
+                      .map((entry) => String(entry.committee))
+                  );
+                  const { available, occupied } = partitionCommitteesForRow(row);
+                  return (
+                    <select
+                      value={row.committee}
+                      onChange={(e) => handleUpdateRow(row.id, 'committee', e.target.value)}
+                      style={styles.select}
+                      disabled={loading}
+                    >
+                      <option value="">Select...</option>
+                      <optgroup label="Available">
+                        {available.map((committee) => (
+                          <option key={committee._id} value={committee._id}>
+                            {formatCommitteeOption(committee)}
+                          </option>
+                        ))}
+                      </optgroup>
+                      {showAllCommittees && occupied.length > 0 && (
+                        <optgroup label="Already assigned">
+                          {occupied.map((committee) => (
+                            <option key={committee._id} value={committee._id}>
+                              {formatCommitteeOption(committee, {
+                                selectedElsewhere: selectedElsewhere.has(String(committee._id)),
+                              })}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  );
+                })()}
               </div>
               <div style={styles.tableCell} className="table-cell table-cell-actions table-cell-actions-desktop">
                 {rows.length > 1 && (
@@ -616,7 +708,7 @@ const CommitteesPage = () => {
         />
       )}
         </>
-      ) : (
+      ) : activeTab === 'mine' ? (
         <div style={styles.myLists}>
           {myCommitteesLoading ? (
             <p style={styles.emptyState}>Loading your committee…</p>
@@ -628,7 +720,12 @@ const CommitteesPage = () => {
             myCommittees.map(({ committee, names, count }) => (
               <section key={committee._id} style={styles.myListCard}>
                 <div style={styles.myListHeader}>
-                  <h2 style={styles.myListTitle}>{committee.name}</h2>
+                  <div>
+                    <h2 style={styles.myListTitle}>{committee.name}</h2>
+                    {committee.location && (
+                      <p style={styles.locationLabel}>{committee.location}</p>
+                    )}
+                  </div>
                   <span style={styles.countBadge}>{count} {count === 1 ? 'delegate' : 'delegates'}</span>
                 </div>
                 <div style={styles.rosterCard}>
@@ -652,6 +749,27 @@ const CommitteesPage = () => {
                 </div>
               </section>
             ))
+          )}
+        </div>
+      ) : (
+        <div style={styles.directoryCard}>
+          {loading ? (
+            <p style={styles.emptyState}>Loading locations…</p>
+          ) : committees.length === 0 ? (
+            <p style={styles.emptyState}>No committees found.</p>
+          ) : (
+            <>
+              <div style={styles.directoryHeader}>
+                <span>Committee</span>
+                <span>Location</span>
+              </div>
+              {committees.map((committee) => (
+                <div key={committee._id} style={styles.directoryRow}>
+                  <span style={styles.directoryName}>{committee.name}</span>
+                  <span style={styles.directoryLocation}>{committee.location || '—'}</span>
+                </div>
+              ))}
+            </>
           )}
         </div>
       )}
@@ -731,6 +849,12 @@ const styles = {
     color: '#1e293b',
     fontSize: '1.35rem',
   },
+  locationLabel: {
+    margin: '0.25rem 0 0',
+    color: '#64748b',
+    fontSize: '0.9rem',
+    fontWeight: '500',
+  },
   countBadge: {
     padding: '0.3rem 0.65rem',
     borderRadius: '999px',
@@ -783,6 +907,41 @@ const styles = {
   emptyList: {
     color: '#64748b',
     margin: 0,
+  },
+  directoryCard: {
+    backgroundColor: 'white',
+    padding: '1.5rem',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  },
+  directoryHeader: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr',
+    gap: '1rem',
+    padding: '0 0.75rem 0.75rem',
+    marginBottom: '0.5rem',
+    borderBottom: '1px solid #e2e8f0',
+    color: '#64748b',
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+  },
+  directoryRow: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 1fr',
+    gap: '1rem',
+    padding: '0.85rem 0.75rem',
+    borderBottom: '1px solid #f1f5f9',
+    alignItems: 'center',
+  },
+  directoryName: {
+    color: '#1e293b',
+    fontWeight: '600',
+  },
+  directoryLocation: {
+    color: '#334155',
+    fontWeight: '500',
   },
   lastSubmitted: {
     fontSize: '0.875rem',
@@ -839,6 +998,24 @@ const styles = {
   tableHeaderCell: {
     display: 'flex',
     alignItems: 'center',
+  },
+  committeeHeaderCell: {
+    flexWrap: 'wrap',
+    gap: '0.5rem 0.75rem',
+    justifyContent: 'space-between',
+  },
+  showAllCommitteesButton: {
+    padding: 0,
+    margin: 0,
+    color: '#3b82f6',
+    background: 'none',
+    border: 'none',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    textTransform: 'none',
+    letterSpacing: 'normal',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   tableRow: {
     display: 'grid',
