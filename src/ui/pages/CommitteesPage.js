@@ -210,7 +210,6 @@ const CommitteesPage = ({ canSubmit = true }) => {
   const formatCommitteeOption = (committee, { selectedElsewhere = false } = {}) => {
     const base = formatActivityWithLocation(committee.name, committee.location);
     if (selectedElsewhere) return `${base} (already in your list)`;
-    if (committee.enrollmentCount > 0) return `${base} (${committee.enrollmentCount} signed up)`;
     return base;
   };
 
