@@ -29,36 +29,31 @@ export const formatActivityWithLocation = (name, location) => (
 );
 
 /**
- * Load every workshop/committee location assignment for the location picker.
+ * Load location assignments for workshops or committees (kept independent).
+ * @param {'workshop'|'committee'} kind
  * @returns {Promise<Array<{ key: string, location: string, label: string }>>}
  */
-export const fetchLocationAssignments = async () => {
-  const load = async (path, kind, nameOf) => {
-    try {
-      const { data } = await api.get(path);
-      const items = Array.isArray(data) ? data : [];
-      return items
-        .filter((item) => item?.location)
-        .map((item) => ({
-          key: `${kind}:${item._id}`,
-          location: item.location,
-          label: `${kind === 'workshop' ? 'Workshop' : 'Committee'}: ${nameOf(item)}`,
-        }));
-    } catch (err) {
-      // Empty lists currently 404 from these endpoints.
-      if (err?.response?.status === 404) {
-        return [];
-      }
-      console.error(`Failed to load ${kind} locations:`, err);
+export const fetchLocationAssignments = async (kind) => {
+  const path = kind === 'workshop' ? '/api/workshops' : '/api/committees';
+  const labelPrefix = kind === 'workshop' ? 'Workshop' : 'Committee';
+  try {
+    const { data } = await api.get(path);
+    const items = Array.isArray(data) ? data : [];
+    return items
+      .filter((item) => item?.location)
+      .map((item) => ({
+        key: `${kind}:${item._id}`,
+        location: item.location,
+        label: `${labelPrefix}: ${item.name}`,
+      }));
+  } catch (err) {
+    // Empty lists currently 404 from these endpoints.
+    if (err?.response?.status === 404) {
       return [];
     }
-  };
-
-  const [workshops, committees] = await Promise.all([
-    load('/api/workshops', 'workshop', (item) => item.name),
-    load('/api/committees', 'committee', (item) => item.name),
-  ]);
-  return [...workshops, ...committees];
+    console.error(`Failed to load ${kind} locations:`, err);
+    return [];
+  }
 };
 
 /**

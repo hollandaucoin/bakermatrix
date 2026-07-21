@@ -600,7 +600,7 @@ const CommitteeLocationEditor = ({ committee, onSave }) => {
 
   useEffect(() => {
     let cancelled = false;
-    fetchLocationAssignments().then((data) => {
+    fetchLocationAssignments('committee').then((data) => {
       if (!cancelled) setAssignments(data);
     });
     return () => { cancelled = true; };
@@ -618,7 +618,7 @@ const CommitteeLocationEditor = ({ committee, onSave }) => {
       setMessage('');
       await onSave(committee._id, location || null);
       setMessage('Location updated.');
-      setAssignments(await fetchLocationAssignments());
+      setAssignments(await fetchLocationAssignments('committee'));
     } catch (err) {
       setMessage(err.message || 'Failed to update location.');
     } finally {

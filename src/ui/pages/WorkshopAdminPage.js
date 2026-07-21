@@ -640,7 +640,7 @@ const WorkshopLocationEditor = ({ workshop, onSave }) => {
 
   useEffect(() => {
     let cancelled = false;
-    fetchLocationAssignments().then((data) => {
+    fetchLocationAssignments('workshop').then((data) => {
       if (!cancelled) setAssignments(data);
     });
     return () => { cancelled = true; };
@@ -658,7 +658,7 @@ const WorkshopLocationEditor = ({ workshop, onSave }) => {
       setMessage('');
       await onSave(workshop._id, location || null);
       setMessage('Location updated.');
-      setAssignments(await fetchLocationAssignments());
+      setAssignments(await fetchLocationAssignments('workshop'));
     } catch (err) {
       setMessage(err.message || 'Failed to update location.');
     } finally {
